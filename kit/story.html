@@ -1,0 +1,203 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Kufi;font-weight:900;src:url(fonts/noto-kufi-arabic-arabic-900-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0898-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC}
+@font-face{font-family:Kufi;font-weight:900;src:url(fonts/noto-kufi-arabic-latin-900-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+2000-206F}
+@font-face{font-family:Taj;font-weight:500;src:url(fonts/tajawal-arabic-500-normal.woff2)}
+@font-face{font-family:Taj;font-weight:700;src:url(fonts/tajawal-arabic-700-normal.woff2)}
+@font-face{font-family:Taj;font-weight:800;src:url(fonts/tajawal-arabic-800-normal.woff2)}
+@font-face{font-family:TajL;font-weight:800;src:url(fonts/tajawal-latin-800-normal.woff2)}
+@font-face{font-family:TajL;font-weight:700;src:url(fonts/tajawal-latin-700-normal.woff2)}
+html,body{margin:0;background:#612AFF}
+canvas{display:block}
+</style></head>
+<body><canvas id="c" width="1080" height="1920"></canvas>
+<script>
+const W=1080,H=1920,CY=900,BEAT=15;
+const V='#612AFF',L='#E0FF38',N='#232347',WH='#FFFFFF';
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const CUTS=[90,180,390,480];
+const img={};
+function loadImg(n){return new Promise(r=>{const i=new Image();i.onload=()=>{img[n]=i;r()};i.src='assets/'+n+'.png'})}
+
+// ---------- helpers ----------
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const easeOut=t=>1-Math.pow(1-clamp(t),3);
+const easeInOut=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+const backOut=t=>{t=clamp(t);const s=1.9;return 1+(s+1)*Math.pow(t-1,3)+s*Math.pow(t-1,2)};
+function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
+function pulse(f){ // beat pulse, decays within a beat
+  const p=f%BEAT; return Math.exp(-p/3.2);
+}
+
+function setFont(ctx,font){ctx.font=font;ctx.direction='rtl';ctx.textAlign='center';ctx.textBaseline='alphabetic'}
+
+// headline item: Noto Kufi 900, navy outline + extrude
+function HL(text,size,color){
+  setFont(ctx,`900 ${size}px Kufi`);
+  const m=ctx.measureText(text);
+  const o=Math.round(size*0.07), e=Math.round(size*0.10);
+  return {kind:'hl',text,size,color,o,e,asc:m.actualBoundingBoxAscent,desc:m.actualBoundingBoxDescent,
+    l:m.actualBoundingBoxLeft,r:m.actualBoundingBoxRight,
+    w:m.actualBoundingBoxLeft+m.actualBoundingBoxRight+2*o,
+    h:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent+2*o+e};
+}
+function drawHL(ctx,it,cx,top){
+  const by=top+it.o+it.asc;
+  setFont(ctx,`900 ${it.size}px Kufi`);
+  ctx.lineJoin='miter';ctx.miterLimit=2;ctx.lineWidth=it.o*2;
+  ctx.fillStyle=N;ctx.strokeStyle=N;
+  for(let k=it.e;k>=1;k-=1){ctx.strokeText(it.text,cx,by+k);ctx.fillText(it.text,cx,by+k)}
+  ctx.strokeText(it.text,cx,by);
+  ctx.fillStyle=it.color;ctx.fillText(it.text,cx,by);
+}
+// small text item (Tajawal), no outline
+function TX(text,size,color,weight=800){
+  setFont(ctx,`${weight} ${size}px Taj`);
+  const m=ctx.measureText(text);
+  return {kind:'tx',text,size,color,weight,asc:m.actualBoundingBoxAscent,desc:m.actualBoundingBoxDescent,
+    w:m.actualBoundingBoxLeft+m.actualBoundingBoxRight,h:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent};
+}
+function drawTX(ctx,it,cx,top){setFont(ctx,`${it.weight} ${it.size}px Taj`);ctx.fillStyle=it.color;ctx.fillText(it.text,cx,top+it.asc)}
+
+// raised box: navy outline + extrude
+function raised(ctx,x,y,w,h,fill,o=6,e=12){
+  ctx.fillStyle=N;ctx.fillRect(x-o,y-o,w+2*o,h+2*o+e);
+  ctx.fillStyle=fill;ctx.fillRect(x,y,w,h);
+}
+
+// lay out a centred column; items: [{it,gap}] -> tops (ink-measured)
+function column(items){
+  let total=0;items.forEach((x,i)=>{total+=(i?x.gap:0)+x.it.h});
+  let y=CY-total/2;const tops=[];
+  items.forEach((x,i)=>{if(i)y+=x.gap;tops.push(y);y+=x.it.h});
+  return tops;
+}
+
+// pop-in transform around an item centre
+function withPop(ctx,f,start,cx,cy,fn){
+  if(f<start)return;
+  const t=(f-start)/7;const s=t>=1?1:Math.max(0.01,backOut(t));
+  ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);ctx.translate(-cx,-cy);fn();ctx.restore();
+}
+
+// ---------- background ----------
+function background(f){
+  ctx.fillStyle=V;ctx.fillRect(0,0,W,H);
+  const p=pulse(f);
+  if(p>0.02){ // pixel checker flash on the beat (navy at low alpha)
+    ctx.fillStyle=N;ctx.globalAlpha=0.10*p;const g=60;
+    for(let y=0;y<H;y+=g)for(let x=0;x<W;x+=g)if(((x+y)/g)%2===0)ctx.fillRect(x,y,g,g);
+    ctx.globalAlpha=1;
+  }
+}
+
+// scene wrapper: entry zoom + beat pulse
+function sceneXf(f,start,fn){
+  const z=1+0.06*(1-easeOut((f-start)/10));
+  const s=z*(1+0.018*pulse(f));
+  ctx.save();ctx.translate(540,CY);ctx.scale(s,s);ctx.translate(-540,-CY);fn();ctx.restore();
+}
+
+
+// ================= Pixelat IG stories =================
+// URL params: mode=designed|repost, theme=<index>, level=<n>
+const Q=new URLSearchParams(location.search);
+const MODE=Q.get('mode')||'designed';
+let THEME=null;
+const GND=1460, U=22;
+const HERO_RUN=[[".XXXXXX.","XXXXXXXX","XEXXEXXX","XEXXEXXX","XXXXXXXX","XXXXXXXX",".XXXXXX.",".XX..X..",".X...XX."],
+                [".XXXXXX.","XXXXXXXX","XEXXEXXX","XEXXEXXX","XXXXXXXX","XXXXXXXX",".XXXXXX.","..X..XX.",".XX...X."]];
+const HERO_JUMP=[".XXXXXX.","XXXXXXXX","XEXXEXXX","XEXXEXXX","XXXXXXXX","XXXXXXXX",".XXXXXX.",".X....X.","........"];
+function sprite(g,sp,x,y,u){const o=Math.max(2,Math.round(u*0.3));
+  g.fillStyle=N;sp.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch!=='.')g.fillRect(x+c*u-o,y+r*u-o,u+2*o,u+2*o+3)}));
+  sp.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='.')return;g.fillStyle=ch==='E'?N:L;g.fillRect(x+c*u,y+r*u,u,u)}));}
+function heart(x,y,s,on){const P=[".XX.XX.","XXXXXXX","XXXXXXX",".XXXXX.","..XXX..","...X..."];
+  P.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X'){ctx.fillStyle=N;ctx.fillRect(x+c*s-3,y+r*s-3,s+6,s+6)}}));
+  P.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X'){ctx.fillStyle=on?L:V;ctx.fillRect(x+c*s,y+r*s,s,s)}}));}
+function sky(f){
+  // graded violet sky in bands (pixel steps), clouds, ground
+  const bands=['#4F1FE6','#5524F2','#5B27FA','#612AFF','#612AFF'];
+  bands.forEach((c,i)=>{ctx.fillStyle=c;ctx.fillRect(0,i*120,W,i===4?H:120)});
+  ctx.fillStyle=V;ctx.fillRect(0,600,W,H-600);
+  const p=pulse(f);if(p>0.02){ctx.fillStyle=N;ctx.globalAlpha=0.08*p;for(let y=600;y<GND;y+=60)for(let x=0;x<W;x+=60)if(((x+y)/60)%2===0)ctx.fillRect(x,y,60,60);ctx.globalAlpha=1}
+  ctx.fillStyle=WH;[[60,190,5],[640,150,4],[820,230,3]].forEach(([x,y,n])=>{const xx=((x+f*1.2)%1300)-150;ctx.fillRect(xx,y,n*36,36);ctx.fillRect(xx+36,y-36,(n-2)*36,36)});
+  // ground: lime top row + navy blocks
+  for(let x=0;x<W;x+=60){ctx.fillStyle=N;ctx.fillRect(x,GND,60,H-GND);ctx.fillStyle=L;ctx.fillRect(x+3,GND+3,54,18);ctx.fillStyle='#2E2E5C';ctx.fillRect(x+6,GND+30,48,48)}
+}
+function hud(f,level){
+  // hearts on the left, level on the right (RTL), inside the story safe zone
+  for(let i=0;i<3;i++)heart(70+i*80,286,9,!(i===2&&Math.floor(f/10)%2&&f<60));
+  const t=`مرحلة ${level}`;setFont(ctx,'800 44px Taj, TajL');const m=ctx.measureText(t);const w=m.width+48;
+  raised(ctx,W-70-w,276,w,74,N,5,8);ctx.fillStyle=WH;ctx.fillText(t,W-70-w/2,328);
+}
+// ---------- designed story ----------
+let D;
+function initDesigned(){
+  const a=HL(THEME.a,92,WH), b=HL(THEME.b,92,L);
+  const fit=(it,txt,col)=>{let s=92;while(it.w>940&&s>56){s-=4;it=HL(txt,s,col)}return it};
+  D={a:fit(a,THEME.a,WH),b:fit(b,THEME.b,L)};
+  D.ta=400;D.tb=D.ta+D.a.h+40;
+  setFont(ctx,'800 44px Taj');D.bodyW=Math.min(900,ctx.measureText(THEME.body).width+80);
+  const bt=TX('راسلنا بالخاص',54,N,800);D.bt={t:bt,w:bt.w+120,h:112};
+}
+function bodyCard(cx,cy,s){
+  const w=D.bodyW,h=130;ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);
+  raised(ctx,-w/2,-h/2,w,h,WH,6,12);setFont(ctx,'800 44px Taj');ctx.fillStyle=N;
+  const m=ctx.measureText(THEME.body);ctx.fillText(THEME.body,0,(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2);ctx.restore();
+}
+function qBlock(x,y,bump,used){
+  ctx.fillStyle=N;ctx.fillRect(x-6,y-6-bump,132,132+12);
+  ctx.fillStyle=used?'#3A3A66':L;ctx.fillRect(x,y-bump,120,120);
+  if(!used){ctx.fillStyle=N;[[12,12],[96,12],[12,96],[96,96]].forEach(([a,b])=>ctx.fillRect(x+a,y-bump+b,12,12));
+    setFont(ctx,'900 84px Kufi');ctx.fillStyle=N;ctx.fillText('؟',x+60,y-bump+92);}
+}
+function drawDesigned(f){
+  sky(f);hud(f,LEVEL);
+  // slanted title
+  ctx.save();ctx.translate(540,D.ta+D.a.h);ctx.rotate(-0.045);ctx.translate(-540,-(D.ta+D.a.h));
+  withPop(ctx,f,4,540,D.ta+D.a.h/2,()=>drawHL(ctx,D.a,540,D.ta));
+  withPop(ctx,f,14,540,D.tb+D.b.h/2,()=>drawHL(ctx,D.b,540,D.tb));
+  ctx.restore();
+  // hero runs in from the right, jumps and hits the block at f=48
+  const bx=480,by=992;
+  let hx,hy=GND-9*U;
+  if(f<36){hx=W+40-(f/36)*(W+40-bx-6)}else hx=bx+6;
+  if(f>=36&&f<60){const t=(f-36)/24;hy=GND-9*U-4*150*t*(1-t)}
+  const hit=f>=48;const bump=f>=48&&f<54?Math.sin((f-48)/6*Math.PI)*24:0;
+  qBlock(bx,by,bump,hit);
+  // card rises out of the block
+  if(hit){const t=easeOut((f-48)/12);const cy=by-20-t*(by-20-862);const s=0.3+0.7*t;bodyCard(540,cy,s);
+    if(f<70){ctx.fillStyle=L;for(let i=0;i<6;i++){const a=i/6*Math.PI*2,r=(f-48)*9;ctx.fillRect(bx+60+Math.cos(a)*r-8,by-40+Math.sin(a)*r-8,16,16)}}}
+  const sp=(f>=36&&f<60)?HERO_JUMP:(f<36?HERO_RUN[Math.floor(f/3)%2]:(Math.floor(f/15)%2?HERO_RUN[0]:HERO_JUMP));
+  const hop=f>=90?-Math.abs(Math.sin((f-90)/15*Math.PI))*18:0;
+  sprite(ctx,sp,hx,hy+hop,U);
+  // CTA button
+  withPop(ctx,f,72,540,1596,()=>{const b=D.bt;const press=f>=90&&(f%30)<5?8:0;const x=Math.round(540-b.w/2),y=1540+press;
+    ctx.fillStyle=N;ctx.fillRect(x-7,y-7,b.w+14,b.h+14+14-press);ctx.fillStyle=L;ctx.fillRect(x,y,b.w,b.h);drawTX(ctx,b.t,540,y+(b.h-b.t.h)/2)});
+}
+// ---------- repost frame (video is composited by ffmpeg into the window) ----------
+const WINR={x:252,y:470,w:576,h:1024};
+let RP;
+function initRepost(){RP={a:HL('شفت هذا؟',96,WH),lab:TX('الريل كامل بالحساب',56,L,800)}}
+function drawRepost(f){
+  sky(f);
+  drawHL(ctx,RP.a,540,262);
+  const {x,y,w,h}=WINR;
+  // game-screen frame: navy outline + lime bezel with stepped corners + extrude
+  ctx.fillStyle=N;ctx.fillRect(x-40,y-40,w+80,h+80+18);
+  ctx.fillStyle=L;ctx.fillRect(x-28,y-22,w+56,h+44);ctx.fillRect(x-22,y-28,w+44,h+56);
+  ctx.fillStyle=N;ctx.fillRect(x-8,y-8,w+16,h+16);
+  ctx.clearRect(x,y,w,h); // transparent window
+  // pixel arrow pointing up (to the profile) + label
+  drawTX(ctx,RP.lab,540,1588);
+}
+let LEVEL=1;
+function draw(f){ctx.clearRect(0,0,W,H);if(MODE==='repost')drawRepost(f);else drawDesigned(f);}
+(async()=>{
+  await Promise.all(['900 40px Kufi','800 40px Taj','700 40px Taj','800 40px TajL'].map(x=>document.fonts.load(x,'بكسلات 0123؟')));
+  if(MODE==='designed'){const r=window.__CONTENT;const i=+(Q.get('theme')||0)%r.themes.length;THEME=r.themes[i];LEVEL=+(Q.get('level')||i+1);initDesigned();}
+  else initRepost();
+  window.draw=draw;window.TOTAL=MODE==='repost'?1:210;window.ready=true;
+})();
+</script></body></html>
