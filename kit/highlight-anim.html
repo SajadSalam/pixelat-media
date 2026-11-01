@@ -1,0 +1,281 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Kufi;font-weight:900;src:url(fonts/noto-kufi-arabic-arabic-900-normal.woff2) format('woff2');unicode-range:U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0898-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC}
+@font-face{font-family:Kufi;font-weight:900;src:url(fonts/noto-kufi-arabic-latin-900-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+2000-206F}
+@font-face{font-family:Taj;font-weight:800;src:url(fonts/tajawal-arabic-800-normal.woff2)}
+@font-face{font-family:TajL;font-weight:800;src:url(fonts/tajawal-latin-800-normal.woff2)}
+html,body{margin:0;background:#612AFF}canvas{display:block}
+</style></head>
+<body><canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// Pixelat animated highlight stories. ?s=<id>. window.draw(f) renders frame f (30 fps), window.TOTAL frames.
+// Two layers: a 180x320 pixel-art layer scaled x6 (scene), and full-res type + original logo on top.
+const W=1080,H=1920,S=6,PW=180,PH=320,FPS=30,BEAT=15;
+const V='#612AFF',L='#E0FF38',N='#232347',WH='#FFFFFF';
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const pc=document.createElement('canvas');pc.width=PW;pc.height=PH;const p=pc.getContext('2d');
+const img={};const load=(k,src)=>new Promise(r=>{const i=new Image();i.onload=()=>{img[k]=i;r()};i.src=src});
+
+// ---------- timing helpers ----------
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const easeOut=t=>1-Math.pow(1-clamp(t),3);
+const backOut=t=>{t=clamp(t);const s=1.9;return 1+(s+1)*Math.pow(t-1,3)+s*Math.pow(t-1,2)};
+const pulse=f=>Math.exp(-(f%BEAT)/3.2);
+function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
+const step=(v,q)=>Math.round(v/q)*q; // pixel-stepped motion
+
+// ---------- pixel layer helpers (low-res coords) ----------
+let G=p; // current pixel target
+const R=(x,y,w,h,col)=>{G.fillStyle=col;G.fillRect(Math.round(x),Math.round(y),w,h)};
+function dith(x,y,w,h,col,lvl){G.fillStyle=col;for(let j=0;j<h;j++)for(let i=0;i<w;i++){const X=x+i,Y=y+j;
+  const on=lvl===2?((X+Y)&1)===0:lvl===1?(X%2===0&&Y%2===0):lvl===3?!(X%2===1&&Y%2===1):false;if(on)G.fillRect(X,Y,1,1)}}
+const CM={N,L,W:WH,V};
+function spr(rows,x,y,map=CM){rows.forEach((r,j)=>[...r].forEach((ch,i)=>{const col=map[ch];if(col){G.fillStyle=col;G.fillRect(Math.round(x)+i,Math.round(y)+j,1,1)}}))}
+// raised pixel box: navy outline 1 + extrude 2 below
+function box(x,y,w,h,fill){R(x-1,y-1,w+2,h+4,N);R(x,y,w,h,fill)}
+function sparkle(x,y,t,col=L){ // 4-point star that grows then shrinks, t 0..1
+  if(t<=0||t>=1)return;const s=t<.5?Math.ceil(t*6):Math.ceil((1-t)*6);
+  R(x,y-s,1,2*s+1,col);R(x-s,y,2*s+1,1,col);if(s>2){R(x-1,y-1,3,3,col)}}
+
+// ---------- full-res type helpers ----------
+function setFont(font){ctx.font=font;ctx.direction='rtl';ctx.textAlign='center';ctx.textBaseline='alphabetic'}
+function HL(text,color,size=92){let it;do{setFont(`900 ${size}px Kufi`);const m=ctx.measureText(text);const o=Math.round(size*.07),e=Math.round(size*.10);
+  it={text,size,color,o,e,asc:m.actualBoundingBoxAscent,w:m.actualBoundingBoxLeft+m.actualBoundingBoxRight+2*o,h:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent+2*o+e};size-=4}
+  while(it.w>940&&size>56);return it}
+function drawHL(it,cx,top){const by=top+it.o+it.asc;setFont(`900 ${it.size}px Kufi`);ctx.lineJoin='miter';ctx.miterLimit=2;ctx.lineWidth=it.o*2;
+  ctx.fillStyle=N;ctx.strokeStyle=N;for(let k=it.e;k>=1;k--){ctx.strokeText(it.text,cx,by+k);ctx.fillText(it.text,cx,by+k)}
+  ctx.strokeText(it.text,cx,by);ctx.fillStyle=it.color;ctx.fillText(it.text,cx,by)}
+function inkTX(text,size){setFont(`800 ${size}px Taj, TajL`);const m=ctx.measureText(text);return {w:m.actualBoundingBoxLeft+m.actualBoundingBoxRight,asc:m.actualBoundingBoxAscent,h:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent}}
+function pop(f,start,cx,cy,fn,dur=8){if(f<start)return;const t=(f-start)/dur;const s=t>=1?1:Math.max(.01,backOut(t));
+  ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);ctx.translate(-cx,-cy);fn();ctx.restore()}
+function beatScale(f,from,cx,cy,fn,amt=.018){const s=f>=from?1+amt*pulse(f):1;ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);ctx.translate(-cx,-cy);fn();ctx.restore()}
+function card(text,cx,top,size=46){const t=inkTX(text,size);const w=Math.min(960,t.w+96),h=t.h+70,o=6,e=12;
+  ctx.fillStyle=N;ctx.fillRect(cx-w/2-o,top-o,w+2*o,h+2*o+e);ctx.fillStyle=WH;ctx.fillRect(cx-w/2,top,w,h);
+  ctx.fillStyle=N;setFont(`800 ${size}px Taj, TajL`);ctx.fillText(text,cx,top+h/2-t.h/2+t.asc);return h+e}
+
+// original logo, revealed cell by cell (the finished frame is the untouched file)
+let LOGO;
+function initLogo(w,top){const i=img.lockup;const h=Math.round(i.height*w/i.width);const cell=20;
+  const cols=Math.ceil(w/cell),rows=Math.ceil(h/cell);const r=rng(7);const cells=[];
+  for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){const d=(cols-1-x)/cols; // RTL sweep, right to left, with jitter
+    cells.push({x,y,t:d*0.75+r()*0.25})}
+  LOGO={w,h,top,cell,cells,x:540-w/2}}
+function drawLogo(f,start,dur){const {w,h,top,cell,cells,x}=LOGO;const i=img.lockup;const sx=i.width/w;
+  const t=(f-start)/dur;if(t<=0)return;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  if(t>=1.25){ctx.drawImage(i,x,top,w,h);return}
+  cells.forEach(cl=>{const k=clamp((t-cl.t)/0.25);if(k<=0)return;
+    const s=k>=1?1:backOut(k);const cx=x+cl.x*cell+cell/2,cy=top+cl.y*cell+cell/2-(1-easeOut(k))*30;
+    ctx.save();ctx.translate(cx,cy);ctx.scale(s,s);
+    ctx.drawImage(i,cl.x*cell*sx,cl.y*cell*sx,cell*sx,cell*sx,-cell/2,-cell/2,cell,cell);ctx.restore()})}
+
+// ================= scene: the Pixelat studio (about-1) =================
+const HERO=[".XXXXXX.","XXXXXXXX","XEXXEXXX","XEXXEXXX","XXXXXXXX","XXXXXXXX",".XXXXXX.",".XX..XX.",".X....X."];
+const HERO_BLINK=[".XXXXXX.","XXXXXXXX","XXXXXXXX","XEEXEEXX","XXXXXXXX","XXXXXXXX",".XXXXXX.",".XX..XX.",".X....X."];
+function hero(x,y,u,blink){const sp=blink?HERO_BLINK:HERO;
+  sp.forEach((r,j)=>[...r].forEach((ch,i)=>{if(ch!=='.')R(x+i*u-1,y+j*u-1,u+2,u+3,N)}));
+  sp.forEach((r,j)=>[...r].forEach((ch,i)=>{if(ch==='.')return;R(x+i*u,y+j*u,u,u,ch==='E'?N:L)}))}
+const PALM=["....NNNN.......","..NNNNNNNN.NN..",".NN...NNNNNNNN.","NN...NNNN...NNN","N...NN.NN....NN","...NN..NN.....N","..N....NN......","........N......","........NN.....","........NN.....",".........N.....",".........NN....",".........NN....","........NNN....","........NN....."];
+const MEGA=["................NNNN","..............NNLLLN","............NNLLLLLN","..........NNLLLLLLLN","NNNNNNNNNNLLLLLLLLLN","NLLLLLLLLLLLLLLLLLLN","NLWWWLLLLLLLLLLLLLLN",
+            "NLLLLLLLLLLLLLLLLLLN","NNNNNNNNNNLLLLLLLLLN","...NLLN...NNLLLLLLLN","...NLLN.....NNLLLLLN","...NNNN.......NNLLLN","................NNNN"];
+function room(f){
+  R(0,0,PW,PH,V);
+  // floating pixels on the wall (depth), slow upward drift + twinkle
+  {const r=rng(21);for(let k=0;k<26;k++){const x=Math.floor(r()*PW),y0=40+r()*120,sp=0.08+r()*0.12,ph=r()*60;
+    const y=Math.round(((y0-f*sp)%120+120)%120)+30;const tw=((f+ph)>>3)%5;if(tw===0)continue;
+    R(x,y,1,1,k%4===0?L:WH);if(tw===2&&k%3===0){R(x-1,y,3,1,k%4===0?L:WH);R(x,y-1,1,3,k%4===0?L:WH)}}}
+  // floor with perspective lines
+  const FY=252;R(0,FY,PW,PH-FY,N);R(0,FY,PW,1,L);
+  const VX=90,VY=196;
+  for(let xb=-120;xb<=300;xb+=30)for(let y=FY+1;y<PH;y++){const x=Math.round(VX+(xb-VX)*(y-VY)/(PH-VY));if(x>=0&&x<PW&&(y&1))R(x,y,1,1,V)}
+  [258,266,278,296].forEach(y=>{for(let x=(y&1);x<PW;x+=2)R(x,y,1,1,V)});
+}
+function studio(f){
+  room(f);
+  const rise=step((1-easeOut((f-6)/22))*120,2);
+  p.save();p.translate(0,rise);
+  const DY=224;
+  // --- window: Baghdad night (palms, moon, stars) ---
+  const wx=114,wy=150,ww=60,wh=44;
+  if(f>=14){box(wx,wy,ww,wh,WH);R(wx+2,wy+2,ww-4,wh-4,N);
+    spr(["..LLL..",".LLLLL.","LLLLLLL","LLLNLLL","LLLLLLL",".LLLLL.","..LLL.."],wx+6,wy+5);
+    const r=rng(3);for(let k=0;k<9;k++){const sx=wx+18+Math.floor(r()*36),sy=wy+4+Math.floor(r()*14);if(((f>>3)+k)%4)R(sx,sy,1,1,WH)}
+    R(wx+2,wy+wh-5,ww-4,3,V);
+    spr(PALM,wx+28,wy+wh-4-PALM.length,{N:V});spr(PALM.slice(3),wx+43,wy+wh-4-PALM.length+2,{N:V});
+    R(wx+ww/2-1,wy+2,2,wh-4,WH);R(wx+2,wy+wh/2-1,ww-4,2,WH)}
+  // --- desk ---
+  box(2,DY,176,3,L);R(2,DY+4,176,22,N);
+  [[10,78],[92,78]].forEach(([x,w])=>{R(x,DY+8,w,1,V);R(x,DY+20,w,1,V);R(x,DY+8,1,13,V);R(x+w-1,DY+8,1,13,V);R(x+w/2-5,DY+13,10,2,L)});
+  R(6,DY+26,4,26,N);R(170,DY+26,4,26,N);
+  // --- monitor (video editing) ---
+  const mx=30,my=154,mw=84,mh=56;
+  if(f>=34){const dy=step((1-easeOut((f-34)/8))*-30,2);p.save();p.translate(0,dy);
+    R(mx+mw/2-7,my+mh+2,14,8,N);R(mx+mw/2-14,my+mh+9,28,2,N);
+    box(mx,my,mw,mh,WH);R(mx+3,my+3,mw-6,mh-6,N);
+    const on=clamp((f-44)/8);const sh=Math.max(1,Math.round((mh-8)*on));const sy=my+4+Math.floor((mh-8-sh)/2);
+    if(f>=44){R(mx+4,sy,mw-8,sh,V);
+      if(on>=1){const pvh=28;
+        // preview: big play triangle, beats on the pulse
+        const big=f>=100&&pulse(f)>.5;
+        spr(big?["WW......","WWWW....","WWWWWW..","WWWWWWWW","WWWWWW..","WWWW....","WW......"]:["W.....","WWW...","WWWWW.","WWWWWW","WWWWW.","WWW...","W....."],mx+mw/2-3,my+4+pvh/2-4);
+        R(mx+4,my+4+pvh,mw-8,2,N);
+        const ty=my+8+pvh;R(mx+8,ty+1,34,3,L);R(mx+28,ty+7,44,3,WH);R(mx+12,ty+13,26,3,L);
+        const ph=mx+7+((f-52)*0.9)%(mw-14);R(ph,ty-1,1,18,WH);R(ph-1,ty-2,3,2,WH)}}
+    p.restore()}
+  // --- phone on a stand («متجرك» store screen) ---
+  const fx=120,fy=182,fw=22,fh=40;
+  if(f>=50){const s=clamp((f-50)/6);const dy=step((1-backOut(s))*14,1);p.save();p.translate(0,dy);
+    R(fx+5,fy+fh-2,12,4,N);box(fx,fy,fw,fh,N);
+    if(f>=56){R(fx+2,fy+3,fw-4,fh-7,WH);R(fx+2,fy+3,fw-4,5,V);R(fx+4,fy+5,6,1,WH);
+      for(let k=0;k<4;k++){const cx=fx+3+(k%2)*9,cy=fy+10+Math.floor(k/2)*10;R(cx,cy,7,7,k===((f>>4)%4)?V:L);R(cx,cy+7,7,1,N)}
+      R(fx+4,fy+fh-8,fw-8,3,N)}
+    p.restore()}
+  // --- megaphone + sound waves (promotion) ---
+  const gx=146,gy=DY-14;
+  if(f>=60){const s=clamp((f-60)/6);const dy=step((1-backOut(s))*14,1);spr(MEGA,gx,gy+dy);
+    if(f>=68){for(let k=0;k<3;k++){const ph=((f-68)/12+k*0.33)%1;const xx=gx+21+Math.round(ph*10),hh=4+Math.round(ph*12);
+      if(ph<0.92)R(xx,gy+6-hh/2,1,hh,ph<.5?WH:L)}}}
+  // --- hero drops onto the desk and bobs on the beat ---
+  if(f>=74){const u=3,hh=9*u;const t=clamp((f-74)/10);const hy0=DY-1-hh;let hy=hy0-Math.round((1-t)*(1-t)*140);
+    const land=f>=84&&f<88;const bob=f>=96?-Math.round(2*pulse(f)):0;
+    hero(4,hy+bob+(land?1:0),u,(f%60)>54);
+    if(f>=84&&f<100)for(let k=0;k<3;k++)sparkle(16+(k-1)*14,DY-34-(k===1?6:0),(f-84-k*2)/12,k===1?WH:L)}
+  p.restore();
+}
+
+// ================= about-2: the picture that sharpens =================
+const QW=300,QH=180;const qc=document.createElement('canvas');qc.width=QW;qc.height=QH;const q=qc.getContext('2d');
+function curve(x0,y0,cx,cy,x1,y1,w0,w1,col){ // thick quadratic curve, tapering, pixel-aligned
+  G.fillStyle=col;for(let i=0;i<=240;i++){const s=i/240,a=1-s;const x=a*a*x0+2*a*s*cx+s*s*x1,y=a*a*y0+2*a*s*cy+s*s*y1;
+    const w=Math.max(1,Math.round(w0+(w1-w0)*s));G.fillRect(Math.round(x-w/2),Math.round(y-w/2),w,w)}}
+function palm(bx,by,tx,ty,lean){ // trunk from base (bx,by) to crown (tx,ty)
+  curve(bx,by,bx+lean,(by+ty)/2,tx,ty,7,4,N);
+  for(let y=ty+6;y<by;y+=6){const s=(y-ty)/(by-ty);const x=Math.round(tx+(bx-tx)*s+lean*2*s*(1-s));G.fillStyle=V;G.fillRect(x-1,y,2,1)}
+  [[-34,10,-40,26],[-26,-4,-38,6],[-8,-14,-20,-12],[10,-14,22,-10],[28,-4,38,8],[34,10,40,28],[0,-6,-2,22]].forEach(([cx,cy,ex,ey])=>
+    curve(tx,ty,tx+cx,ty+cy-8,tx+ex,ty+ey,4,1,N));
+  G.fillStyle=N;G.fillRect(tx-4,ty-2,9,6)}
+function picture(t){G=q;
+  R(0,0,QW,QH,V);dith(0,0,QW,18,N,3);dith(0,18,QW,22,N,2);dith(0,40,QW,22,N,1);
+  const r=rng(5);for(let k=0;k<14;k++){const x=Math.floor(r()*QW),y=Math.floor(r()*56);if(((t>>3)+k)%5)R(x,y,1,1,WH)}
+  // retro sunset: lime disc with violet bands
+  const sx=184,sy=96,sr=42;G.fillStyle=L;for(let y=-sr;y<=sr;y++){const w=Math.round(Math.sqrt(sr*sr-y*y));G.fillRect(sx-w,sy+y,2*w,1)}
+  [[6,2],[14,3],[23,4],[33,5]].forEach(([o,h])=>R(sx-sr,sy+o,2*sr,h,V));
+  R(sx-10,sy-30,8,3,WH);R(sx-14,sy-27,4,3,WH); // highlight
+  // far bank + river
+  R(0,122,QW,8,N);for(let x=0;x<QW;x+=9)R(x,118+((x*7)%5),5,6,N);
+  R(0,130,QW,QH-130,N);
+  [[134,30],[140,44],[148,58],[157,40],[168,70]].forEach(([y,w],i)=>{const o=Math.round(Math.sin(t/10+i)*4);R(sx-w/2+o,y,w,2,i%2?WH:L)});
+  for(let k=0;k<12;k++){const x=(k*53+Math.floor(t*0.6))%QW,y=136+(k*17)%42;R(x,y,6,1,V)}
+  // a little Iraqi boat (بلم) drifting
+  const bx=Math.round(40+((t*0.35)%140)),by=150;R(bx,by,26,3,WH);R(bx+2,by+3,22,2,WH);R(bx-2,by-1,3,2,WH);R(bx+25,by-1,3,2,WH);R(bx+12,by-12,1,12,WH);R(bx+9,by-6,4,6,WH);
+  palm(44,QH,58,52,-18);palm(282,QH,266,70,14);palm(112,128,118,94,-4);
+  G=p}
+const PIX={};
+function coarse(cell){if(PIX[cell])return PIX[cell];picture(0);const d=q.getImageData(0,0,QW,QH).data;
+  const cv=document.createElement('canvas');cv.width=QW;cv.height=QH;const g=cv.getContext('2d');
+  for(let y=0;y<QH;y+=cell)for(let x=0;x<QW;x+=cell){const sx=Math.min(QW-1,x+(cell>>1)),sy=Math.min(QH-1,y+(cell>>1)),i=(sy*QW+sx)*4;
+    g.fillStyle=`rgb(${d[i]},${d[i+1]},${d[i+2]})`;g.fillRect(x,y,cell,cell)}
+  return PIX[cell]=cv}
+const SCR={x:13,y:80,w:154,h:94};const HY2=283-27; // hero stands forward on the floor in about-2 // low-res screen box; picture sits 2 px inside at x2 scale
+function sharpCell(f){if(f<58)return 20;if(f<61)return 10;if(f<64)return 5;if(f<67)return 3;if(f<70)return 2;return 1}
+function frameScene(f){
+  room(f);
+  const drop=step((1-easeOut((f-2)/12))*-160,2);
+  // screen casing (white, navy outline + extrude), hung by two navy wires
+  box(SCR.x,SCR.y+drop,SCR.w,SCR.h,WH);R(SCR.x+1,SCR.y+drop+1,SCR.w-2,SCR.h-2,N);
+  R(SCR.x+SCR.w/2-2,SCR.y+drop+SCR.h-1,4,1,f>=70?L:V); // power led
+  // hero walks in from the right, wonders, jumps
+  const HX=154,u=3,HY=HY2;let hx=HX,hy=HY;
+  if(f<14)hx=PW+10;else if(f<34){const t=(f-14)/20;hx=Math.round(PW+10-(PW+10-HX)*easeOut(t));hy=HY-(((f-14)%6)<3?2:0)}
+  if(f>=46&&f<58){const t=(f-46)/12;hy=HY-Math.round(4*36*t*(1-t))}
+  const bob=f>=96?-Math.round(2*pulse(f)):0;
+  if(f>=14)hero(hx,hy+bob+(f>=58&&f<61?1:0),u,(f%60)>54&&f>40);
+  // thought bubble: «؟» before, a star after
+  if(f>=36&&f<58){const bx=HX-2,by=HY-30;box(bx,by,22,20,WH);R(bx+4,by+21,4,3,WH);R(bx+2,by+25,2,2,WH)}
+  if(f>=58&&f<84)for(let k=0;k<3;k++)sparkle(HX+12+(k-1)*12,HY-14-(k===1?8:0),(f-58-k*3)/14,k===1?WH:L);
+  // sharpening bursts at the screen corners
+  if(f>=58&&f<82){[[SCR.x,SCR.y],[SCR.x+SCR.w,SCR.y],[SCR.x,SCR.y+SCR.h],[SCR.x+SCR.w,SCR.y+SCR.h]].forEach(([x,y],k)=>sparkle(x,y,(f-58-k)/16,k%2?WH:L))}
+  return drop}
+function drawPicture(f,drop){const cell=sharpCell(f);const src=cell===1?(picture(f),qc):coarse(cell);
+  ctx.imageSmoothingEnabled=false;ctx.drawImage(src,(SCR.x+2)*S,(SCR.y+2+drop)*S,QW*3,QH*3)}
+
+// ================= about-3: level select =================
+const TILES=[{x:93,y:84,label:'فيديوهات',icon:'video'},{x:15,y:84,label:'مواقع',icon:'web'},{x:93,y:146,label:'تطبيقات',icon:'apps'},{x:15,y:146,label:'ترويج',icon:'promo'}];
+const TW=72,TH=54;
+function tileIn(i){return 12+i*6}
+function selIdx(f){return f<48?-1:Math.floor((f-48)/15)%4}
+function iconVideo(cx,cy,f){const w=46,h=28,x=cx-w/2,y=cy-h/2;box(x,y,w,h,L);
+  const o=(f>>1)%4;for(let X=x+1-o;X<x+w-1;X+=4){if(X>=x+1){R(X,y+2,2,2,N);R(X,y+h-4,2,2,N)}}
+  R(x+3,y+6,18,16,N);R(x+25,y+6,18,16,N);const which=(f>>4)%2;
+  spr(["W..","WW.","WWW","WW.","W.."],(which?x+25:x+3)+7,y+11)}
+function iconWeb(cx,cy,f){const w=46,h=30,x=cx-w/2,y=cy-h/2;box(x,y,w,h,WH);R(x,y,w,5,V);R(x+2,y+2,2,1,WH);R(x+5,y+2,2,1,L);R(x+8,y+2,2,1,WH);
+  p.save();p.beginPath();p.rect(x+1,y+6,w-2,h-7);p.clip();const sc=Math.round(((f*0.5)%30));
+  for(let k=0;k<2;k++){const yy=y+7-sc+k*30;R(x+3,yy,w-6,8,L);R(x+3,yy+10,24,2,N);R(x+3,yy+14,30,2,V);R(x+3,yy+19,10,8,V);R(x+16,yy+19,10,8,L);R(x+29,yy+19,10,8,V)}
+  p.restore()}
+function iconApps(cx,cy,f){const w=20,h=34,x=cx-w/2,y=cy-h/2;box(x,y,w,h,N);R(x+2,y+3,w-4,h-7,WH);
+  const hi=(f>>3)%9;for(let k=0;k<9;k++){const ix=x+3+(k%3)*5,iy=y+6+Math.floor(k/3)*7;R(ix,iy-(k===hi?1:0),4,4,k===hi?L:V)}
+  R(x+w/2-2,y+h-3,4,1,L)}
+function iconPromo(cx,cy,f){const x=cx-14,y=cy-7;spr(MEGA,x,y);
+  for(let k=0;k<3;k++){const ph=((f/12)+k*0.33)%1;const xx=x+21+Math.round(ph*9),hh=4+Math.round(ph*12);if(ph<0.92)R(xx,y+6-hh/2,1,hh,ph<.5?WH:L)}}
+const ICON={video:iconVideo,web:iconWeb,apps:iconApps,promo:iconPromo};
+function selectScene(f){
+  room(f);
+  TILES.forEach((tl,i)=>{const s0=tileIn(i);if(f<s0)return;const t=clamp((f-s0)/8);const dy=step((1-backOut(t))*-12,1);
+    const sel=selIdx(f)===i;const lift=sel?-2:0;const x=tl.x,y=tl.y+dy+lift;
+    if(sel){R(x-4,y-4,TW+8,TH+8+(-lift)+2,L)} // selector frame
+    box(x,y,TW,TH,V);dith(x,y+TH-14,TW,14,N,1);
+    ICON[tl.icon](x+TW/2,y+19,f)});
+  // hero on the floor, looks toward the button
+  const u=3,HY=252-1-27;const hop=f>=100&&f<112?-Math.round(4*30*((f-100)/12)*(1-(f-100)/12)):0;
+  hero(10,HY+hop-(f>=112?Math.round(2*pulse(f)):0),u,(f%60)>54);
+}
+function tileLabels(f){TILES.forEach((tl,i)=>{const s0=tileIn(i);if(f<s0+3)return;const t=clamp((f-s0)/8);const dy=step((1-backOut(t))*-12,1)*S;
+  const sel=selIdx(f)===i;const cx=(tl.x+TW/2)*S,base=(tl.y+TH-4)*S+dy+(sel?-12:0);
+  setFont('800 50px Taj');ctx.fillStyle=sel?L:WH;ctx.fillText(tl.label,cx,base)})}
+function pressButton(text,f,start,top){const t=inkTX(text,54);const w=t.w+120,h=112;
+  pop(f,start,540,top+h/2,()=>{const press=f>=start+20&&((f-start)%30)<5?8:0;const x=Math.round(540-w/2),y=top+press;
+    ctx.fillStyle=N;ctx.fillRect(x-7,y-7,w+14,h+14+14-press);ctx.fillStyle=L;ctx.fillRect(x,y,w,h);
+    ctx.fillStyle=N;setFont('800 54px Taj');ctx.fillText(text,540,y+h/2-t.h/2+t.asc)})}
+
+// ================= stories =================
+const STORIES={
+  'about-1':{total:210,init(){
+      initLogo(760,262);
+      this.a=HL('كل شي يطلع بالشاشة',WH);this.b=HL('إحنا نسويه',L);
+      this.ta=530;this.tb=this.ta+this.a.h+38; // tuned so measured ink gaps are 80 (logo→line) and 40 (line→line)
+    },draw(f){
+      studio(f);ctx.imageSmoothingEnabled=false;ctx.drawImage(pc,0,0,W,H);
+      drawLogo(f,2,24);
+      beatScale(f,100,540,this.ta+this.a.h/2,()=>pop(f,30,540,this.ta+this.a.h/2,()=>drawHL(this.a,540,this.ta)));
+      beatScale(f,100,540,this.tb+this.b.h/2,()=>pop(f,40,540,this.tb+this.b.h/2,()=>drawHL(this.b,540,this.tb)));
+      // logo sparkles while it lands
+      if(f>=18&&f<44){const r=rng(11);for(let k=0;k<8;k++){const x=LOGO.x+r()*LOGO.w,y=LOGO.top+r()*LOGO.h,d=r()*14;
+        const t=(f-18-d)/12;if(t>0&&t<1){const s=Math.ceil((t<.5?t:1-t)*16)*2;ctx.fillStyle=k%3?L:WH;ctx.fillRect(x-1,y-s,3,2*s);ctx.fillRect(x-s,y-1,2*s,3)}}}
+      pop(f,92,540,1600,()=>card('فيديوهات · مواقع · تطبيقات · ترويج',540,1560));
+    }},
+  'about-2':{total:210,init(){
+      this.a=HL('الصورة مبكسلة؟',WH);this.b=HL('عدنا كل بكسل محسوب',L);
+      this.ta=269;this.tb=1141;this.tc=1331; // tuned: measured ink gaps 80/80/80
+    },draw(f){
+      const drop=frameScene(f);ctx.imageSmoothingEnabled=false;ctx.drawImage(pc,0,0,W,H);drawPicture(f,drop);
+      // «؟» inside the thought bubble (full-res type)
+      if(f>=36&&f<58){setFont('900 64px Kufi');ctx.fillStyle=N;ctx.fillText('؟',(154-2+11)*S,(HY2-30+17)*S)}
+      beatScale(f,100,540,this.ta+this.a.h/2,()=>pop(f,10,540,this.ta+this.a.h/2,()=>drawHL(this.a,540,this.ta)));
+      beatScale(f,100,540,this.tb+this.b.h/2,()=>pop(f,78,540,this.tb+this.b.h/2,()=>drawHL(this.b,540,this.tb)));
+      pop(f,90,540,this.tc+40,()=>card('يعني دقة واهتمام بكل تفصيلة',540,this.tc));
+    }},
+  'about-3':{total:240,init(){this.a=HL("شنو نسوي؟",WH);this.ta=275;this.tb=1306}, // tuned: ink gaps 80 (title→tiles, tiles→button)
+    draw(f){
+      selectScene(f);ctx.imageSmoothingEnabled=false;ctx.drawImage(pc,0,0,W,H);tileLabels(f);
+      beatScale(f,48,540,this.ta+this.a.h/2,()=>pop(f,4,540,this.ta+this.a.h/2,()=>drawHL(this.a,540,this.ta)));
+      pressButton('راسلنا بالخاص',f,100,this.tb);
+    }},
+};
+let ST;
+(async()=>{
+  await Promise.all(['900 40px Kufi','800 40px Taj','800 40px TajL'].map(x=>document.fonts.load(x,'بكسلات 0123؟')));
+  await load('lockup','../brand/logo-lockup-transparent.png');
+  ST=STORIES[new URLSearchParams(location.search).get('s')||'about-1'];ST.init();
+  window.TOTAL=ST.total;window.draw=f=>{ctx.clearRect(0,0,W,H);ST.draw(f)};window.ready=true;
+})();
+</script></body></html>
