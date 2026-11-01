@@ -33,7 +33,11 @@ EV={'about-1':[
     *[(F(2+k*3),'blip',84+[0,3,7,12,7,3,0,5,9,12][k]) for k in range(10)],  # logo assembling, right to left
     (F(30),'pop',79),(F(40),'pop',84),
     (F(36),'thud',0),(F(44),'zap',0),(F(50),'blip',88),(F(56),'chirp',0),(F(60),'honk',0),
-    (F(74),'fall',0),(F(84),'land',0),(F(85),'coin',0),(F(92),'pop',88)]}
+    (F(74),'fall',0),(F(84),'land',0),(F(85),'coin',0),(F(92),'pop',88)],
+  'about-2':[(F(4),'thud',0),(F(10),'pop',79),*[(F(14+k*6),'blip',72+(k%2)*3) for k in range(4)],(F(36),'pop',76),
+    (F(46),'jump',0),(F(58),'land',0),*[(F(58+k*3),'blip',84+k*3) for k in range(5)],(F(70),'coin',0),(F(78),'pop',84),(F(90),'pop',88)],
+  'about-3':[(F(4),'pop',79),*[(F(12+k*6),'pop',76+k*3) for k in range(4)],*[(F(48+k*15),'blip',88 if k%4==0 else 84) for k in range(13)],
+    (F(100),'pop',88),(F(100),'jump',0),*[(F(120+k*30),'press',0) for k in range(4)]]}
 for t,kind,m in EV.get(sid,[]):
     if kind=='blip': add(sfx,t,blip(m,.05),.45)
     elif kind=='pop': add(sfx,t,blip(m,.09),.6)
@@ -43,10 +47,12 @@ for t,kind,m in EV.get(sid,[]):
     elif kind=='honk': add(sfx,t,env(pulse(hz(55),.22,.4),.002,.12),.5); add(sfx,t+.08,env(pulse(hz(58),.18,.4),.002,.1),.35)
     elif kind=='fall': add(sfx,t,sweep(91,72,.3),.35)
     elif kind=='land': add(sfx,t,env(noise(.06),.001,.02),.55)
+    elif kind=='jump': add(sfx,t,sweep(64,80,.18),.45)
+    elif kind=='press': add(sfx,t,env(noise(.03),.001,.01),.35); add(sfx,t,blip(60,.05),.3)
     elif kind=='coin': add(sfx,t,np.concatenate([blip(83,.06),env(pulse(hz(88),.25,.5),.001,.1)]),.6)
 mus/=np.max(np.abs(mus)); sfx/=max(1e-9,np.max(np.abs(sfx))); mix=mus+.6*sfx
 mix[:int(.02*SR)]*=np.linspace(0,1,int(.02*SR)); mix[-int(.4*SR):]*=np.linspace(1,0,int(.4*SR))
-mix=np.tanh(mix*1.1); mix*=.85/np.max(np.abs(mix))
+mix=np.tanh(mix*1.1); mix*=.78/np.max(np.abs(mix))  # headroom for AAC overshoot (peak < 0.9 after encoding)
 pcm=(mix*32767).astype(np.int16)
 with wave.open(out,'wb') as w: w.setnchannels(2);w.setsampwidth(2);w.setframerate(SR);w.writeframes(np.stack([pcm,pcm],1).ravel().tobytes())
 print('peak',round(float(np.max(np.abs(mix))),3))

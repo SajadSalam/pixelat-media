@@ -26,11 +26,12 @@ function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return
 const step=(v,q)=>Math.round(v/q)*q; // pixel-stepped motion
 
 // ---------- pixel layer helpers (low-res coords) ----------
-const R=(x,y,w,h,col)=>{p.fillStyle=col;p.fillRect(Math.round(x),Math.round(y),w,h)};
-function dith(x,y,w,h,col,lvl){p.fillStyle=col;for(let j=0;j<h;j++)for(let i=0;i<w;i++){const X=x+i,Y=y+j;
-  const on=lvl===2?((X+Y)&1)===0:lvl===1?(X%2===0&&Y%2===0):lvl===3?!(X%2===1&&Y%2===1):false;if(on)p.fillRect(X,Y,1,1)}}
+let G=p; // current pixel target
+const R=(x,y,w,h,col)=>{G.fillStyle=col;G.fillRect(Math.round(x),Math.round(y),w,h)};
+function dith(x,y,w,h,col,lvl){G.fillStyle=col;for(let j=0;j<h;j++)for(let i=0;i<w;i++){const X=x+i,Y=y+j;
+  const on=lvl===2?((X+Y)&1)===0:lvl===1?(X%2===0&&Y%2===0):lvl===3?!(X%2===1&&Y%2===1):false;if(on)G.fillRect(X,Y,1,1)}}
 const CM={N,L,W:WH,V};
-function spr(rows,x,y,map=CM){rows.forEach((r,j)=>[...r].forEach((ch,i)=>{const col=map[ch];if(col){p.fillStyle=col;p.fillRect(Math.round(x)+i,Math.round(y)+j,1,1)}}))}
+function spr(rows,x,y,map=CM){rows.forEach((r,j)=>[...r].forEach((ch,i)=>{const col=map[ch];if(col){G.fillStyle=col;G.fillRect(Math.round(x)+i,Math.round(y)+j,1,1)}}))}
 // raised pixel box: navy outline 1 + extrude 2 below
 function box(x,y,w,h,fill){R(x-1,y-1,w+2,h+4,N);R(x,y,w,h,fill)}
 function sparkle(x,y,t,col=L){ // 4-point star that grows then shrinks, t 0..1
@@ -77,7 +78,7 @@ function hero(x,y,u,blink){const sp=blink?HERO_BLINK:HERO;
 const PALM=["....NNNN.......","..NNNNNNNN.NN..",".NN...NNNNNNNN.","NN...NNNN...NNN","N...NN.NN....NN","...NN..NN.....N","..N....NN......","........N......","........NN.....","........NN.....",".........N.....",".........NN....",".........NN....","........NNN....","........NN....."];
 const MEGA=["................NNNN","..............NNLLLN","............NNLLLLLN","..........NNLLLLLLLN","NNNNNNNNNNLLLLLLLLLN","NLLLLLLLLLLLLLLLLLLN","NLWWWLLLLLLLLLLLLLLN",
             "NLLLLLLLLLLLLLLLLLLN","NNNNNNNNNNLLLLLLLLLN","...NLLN...NNLLLLLLLN","...NLLN.....NNLLLLLN","...NNNN.......NNLLLN","................NNNN"];
-function studio(f){
+function room(f){
   R(0,0,PW,PH,V);
   // floating pixels on the wall (depth), slow upward drift + twinkle
   {const r=rng(21);for(let k=0;k<26;k++){const x=Math.floor(r()*PW),y0=40+r()*120,sp=0.08+r()*0.12,ph=r()*60;
@@ -88,6 +89,9 @@ function studio(f){
   const VX=90,VY=196;
   for(let xb=-120;xb<=300;xb+=30)for(let y=FY+1;y<PH;y++){const x=Math.round(VX+(xb-VX)*(y-VY)/(PH-VY));if(x>=0&&x<PW&&(y&1))R(x,y,1,1,V)}
   [258,266,278,296].forEach(y=>{for(let x=(y&1);x<PW;x+=2)R(x,y,1,1,V)});
+}
+function studio(f){
+  room(f);
   const rise=step((1-easeOut((f-6)/22))*120,2);
   p.save();p.translate(0,rise);
   const DY=224;
@@ -139,6 +143,100 @@ function studio(f){
   p.restore();
 }
 
+// ================= about-2: the picture that sharpens =================
+const QW=300,QH=180;const qc=document.createElement('canvas');qc.width=QW;qc.height=QH;const q=qc.getContext('2d');
+function curve(x0,y0,cx,cy,x1,y1,w0,w1,col){ // thick quadratic curve, tapering, pixel-aligned
+  G.fillStyle=col;for(let i=0;i<=240;i++){const s=i/240,a=1-s;const x=a*a*x0+2*a*s*cx+s*s*x1,y=a*a*y0+2*a*s*cy+s*s*y1;
+    const w=Math.max(1,Math.round(w0+(w1-w0)*s));G.fillRect(Math.round(x-w/2),Math.round(y-w/2),w,w)}}
+function palm(bx,by,tx,ty,lean){ // trunk from base (bx,by) to crown (tx,ty)
+  curve(bx,by,bx+lean,(by+ty)/2,tx,ty,7,4,N);
+  for(let y=ty+6;y<by;y+=6){const s=(y-ty)/(by-ty);const x=Math.round(tx+(bx-tx)*s+lean*2*s*(1-s));G.fillStyle=V;G.fillRect(x-1,y,2,1)}
+  [[-34,10,-40,26],[-26,-4,-38,6],[-8,-14,-20,-12],[10,-14,22,-10],[28,-4,38,8],[34,10,40,28],[0,-6,-2,22]].forEach(([cx,cy,ex,ey])=>
+    curve(tx,ty,tx+cx,ty+cy-8,tx+ex,ty+ey,4,1,N));
+  G.fillStyle=N;G.fillRect(tx-4,ty-2,9,6)}
+function picture(t){G=q;
+  R(0,0,QW,QH,V);dith(0,0,QW,18,N,3);dith(0,18,QW,22,N,2);dith(0,40,QW,22,N,1);
+  const r=rng(5);for(let k=0;k<14;k++){const x=Math.floor(r()*QW),y=Math.floor(r()*56);if(((t>>3)+k)%5)R(x,y,1,1,WH)}
+  // retro sunset: lime disc with violet bands
+  const sx=184,sy=96,sr=42;G.fillStyle=L;for(let y=-sr;y<=sr;y++){const w=Math.round(Math.sqrt(sr*sr-y*y));G.fillRect(sx-w,sy+y,2*w,1)}
+  [[6,2],[14,3],[23,4],[33,5]].forEach(([o,h])=>R(sx-sr,sy+o,2*sr,h,V));
+  R(sx-10,sy-30,8,3,WH);R(sx-14,sy-27,4,3,WH); // highlight
+  // far bank + river
+  R(0,122,QW,8,N);for(let x=0;x<QW;x+=9)R(x,118+((x*7)%5),5,6,N);
+  R(0,130,QW,QH-130,N);
+  [[134,30],[140,44],[148,58],[157,40],[168,70]].forEach(([y,w],i)=>{const o=Math.round(Math.sin(t/10+i)*4);R(sx-w/2+o,y,w,2,i%2?WH:L)});
+  for(let k=0;k<12;k++){const x=(k*53+Math.floor(t*0.6))%QW,y=136+(k*17)%42;R(x,y,6,1,V)}
+  // a little Iraqi boat (بلم) drifting
+  const bx=Math.round(40+((t*0.35)%140)),by=150;R(bx,by,26,3,WH);R(bx+2,by+3,22,2,WH);R(bx-2,by-1,3,2,WH);R(bx+25,by-1,3,2,WH);R(bx+12,by-12,1,12,WH);R(bx+9,by-6,4,6,WH);
+  palm(44,QH,58,52,-18);palm(282,QH,266,70,14);palm(112,128,118,94,-4);
+  G=p}
+const PIX={};
+function coarse(cell){if(PIX[cell])return PIX[cell];picture(0);const d=q.getImageData(0,0,QW,QH).data;
+  const cv=document.createElement('canvas');cv.width=QW;cv.height=QH;const g=cv.getContext('2d');
+  for(let y=0;y<QH;y+=cell)for(let x=0;x<QW;x+=cell){const sx=Math.min(QW-1,x+(cell>>1)),sy=Math.min(QH-1,y+(cell>>1)),i=(sy*QW+sx)*4;
+    g.fillStyle=`rgb(${d[i]},${d[i+1]},${d[i+2]})`;g.fillRect(x,y,cell,cell)}
+  return PIX[cell]=cv}
+const SCR={x:13,y:80,w:154,h:94};const HY2=283-27; // hero stands forward on the floor in about-2 // low-res screen box; picture sits 2 px inside at x2 scale
+function sharpCell(f){if(f<58)return 20;if(f<61)return 10;if(f<64)return 5;if(f<67)return 3;if(f<70)return 2;return 1}
+function frameScene(f){
+  room(f);
+  const drop=step((1-easeOut((f-2)/12))*-160,2);
+  // screen casing (white, navy outline + extrude), hung by two navy wires
+  box(SCR.x,SCR.y+drop,SCR.w,SCR.h,WH);R(SCR.x+1,SCR.y+drop+1,SCR.w-2,SCR.h-2,N);
+  R(SCR.x+SCR.w/2-2,SCR.y+drop+SCR.h-1,4,1,f>=70?L:V); // power led
+  // hero walks in from the right, wonders, jumps
+  const HX=154,u=3,HY=HY2;let hx=HX,hy=HY;
+  if(f<14)hx=PW+10;else if(f<34){const t=(f-14)/20;hx=Math.round(PW+10-(PW+10-HX)*easeOut(t));hy=HY-(((f-14)%6)<3?2:0)}
+  if(f>=46&&f<58){const t=(f-46)/12;hy=HY-Math.round(4*36*t*(1-t))}
+  const bob=f>=96?-Math.round(2*pulse(f)):0;
+  if(f>=14)hero(hx,hy+bob+(f>=58&&f<61?1:0),u,(f%60)>54&&f>40);
+  // thought bubble: «؟» before, a star after
+  if(f>=36&&f<58){const bx=HX-2,by=HY-30;box(bx,by,22,20,WH);R(bx+4,by+21,4,3,WH);R(bx+2,by+25,2,2,WH)}
+  if(f>=58&&f<84)for(let k=0;k<3;k++)sparkle(HX+12+(k-1)*12,HY-14-(k===1?8:0),(f-58-k*3)/14,k===1?WH:L);
+  // sharpening bursts at the screen corners
+  if(f>=58&&f<82){[[SCR.x,SCR.y],[SCR.x+SCR.w,SCR.y],[SCR.x,SCR.y+SCR.h],[SCR.x+SCR.w,SCR.y+SCR.h]].forEach(([x,y],k)=>sparkle(x,y,(f-58-k)/16,k%2?WH:L))}
+  return drop}
+function drawPicture(f,drop){const cell=sharpCell(f);const src=cell===1?(picture(f),qc):coarse(cell);
+  ctx.imageSmoothingEnabled=false;ctx.drawImage(src,(SCR.x+2)*S,(SCR.y+2+drop)*S,QW*3,QH*3)}
+
+// ================= about-3: level select =================
+const TILES=[{x:93,y:84,label:'فيديوهات',icon:'video'},{x:15,y:84,label:'مواقع',icon:'web'},{x:93,y:146,label:'تطبيقات',icon:'apps'},{x:15,y:146,label:'ترويج',icon:'promo'}];
+const TW=72,TH=54;
+function tileIn(i){return 12+i*6}
+function selIdx(f){return f<48?-1:Math.floor((f-48)/15)%4}
+function iconVideo(cx,cy,f){const w=46,h=28,x=cx-w/2,y=cy-h/2;box(x,y,w,h,L);
+  const o=(f>>1)%4;for(let X=x+1-o;X<x+w-1;X+=4){if(X>=x+1){R(X,y+2,2,2,N);R(X,y+h-4,2,2,N)}}
+  R(x+3,y+6,18,16,N);R(x+25,y+6,18,16,N);const which=(f>>4)%2;
+  spr(["W..","WW.","WWW","WW.","W.."],(which?x+25:x+3)+7,y+11)}
+function iconWeb(cx,cy,f){const w=46,h=30,x=cx-w/2,y=cy-h/2;box(x,y,w,h,WH);R(x,y,w,5,V);R(x+2,y+2,2,1,WH);R(x+5,y+2,2,1,L);R(x+8,y+2,2,1,WH);
+  p.save();p.beginPath();p.rect(x+1,y+6,w-2,h-7);p.clip();const sc=Math.round(((f*0.5)%30));
+  for(let k=0;k<2;k++){const yy=y+7-sc+k*30;R(x+3,yy,w-6,8,L);R(x+3,yy+10,24,2,N);R(x+3,yy+14,30,2,V);R(x+3,yy+19,10,8,V);R(x+16,yy+19,10,8,L);R(x+29,yy+19,10,8,V)}
+  p.restore()}
+function iconApps(cx,cy,f){const w=20,h=34,x=cx-w/2,y=cy-h/2;box(x,y,w,h,N);R(x+2,y+3,w-4,h-7,WH);
+  const hi=(f>>3)%9;for(let k=0;k<9;k++){const ix=x+3+(k%3)*5,iy=y+6+Math.floor(k/3)*7;R(ix,iy-(k===hi?1:0),4,4,k===hi?L:V)}
+  R(x+w/2-2,y+h-3,4,1,L)}
+function iconPromo(cx,cy,f){const x=cx-14,y=cy-7;spr(MEGA,x,y);
+  for(let k=0;k<3;k++){const ph=((f/12)+k*0.33)%1;const xx=x+21+Math.round(ph*9),hh=4+Math.round(ph*12);if(ph<0.92)R(xx,y+6-hh/2,1,hh,ph<.5?WH:L)}}
+const ICON={video:iconVideo,web:iconWeb,apps:iconApps,promo:iconPromo};
+function selectScene(f){
+  room(f);
+  TILES.forEach((tl,i)=>{const s0=tileIn(i);if(f<s0)return;const t=clamp((f-s0)/8);const dy=step((1-backOut(t))*-12,1);
+    const sel=selIdx(f)===i;const lift=sel?-2:0;const x=tl.x,y=tl.y+dy+lift;
+    if(sel){R(x-4,y-4,TW+8,TH+8+(-lift)+2,L)} // selector frame
+    box(x,y,TW,TH,V);dith(x,y+TH-14,TW,14,N,1);
+    ICON[tl.icon](x+TW/2,y+19,f)});
+  // hero on the floor, looks toward the button
+  const u=3,HY=252-1-27;const hop=f>=100&&f<112?-Math.round(4*30*((f-100)/12)*(1-(f-100)/12)):0;
+  hero(10,HY+hop-(f>=112?Math.round(2*pulse(f)):0),u,(f%60)>54);
+}
+function tileLabels(f){TILES.forEach((tl,i)=>{const s0=tileIn(i);if(f<s0+3)return;const t=clamp((f-s0)/8);const dy=step((1-backOut(t))*-12,1)*S;
+  const sel=selIdx(f)===i;const cx=(tl.x+TW/2)*S,base=(tl.y+TH-4)*S+dy+(sel?-12:0);
+  setFont('800 50px Taj');ctx.fillStyle=sel?L:WH;ctx.fillText(tl.label,cx,base)})}
+function pressButton(text,f,start,top){const t=inkTX(text,54);const w=t.w+120,h=112;
+  pop(f,start,540,top+h/2,()=>{const press=f>=start+20&&((f-start)%30)<5?8:0;const x=Math.round(540-w/2),y=top+press;
+    ctx.fillStyle=N;ctx.fillRect(x-7,y-7,w+14,h+14+14-press);ctx.fillStyle=L;ctx.fillRect(x,y,w,h);
+    ctx.fillStyle=N;setFont('800 54px Taj');ctx.fillText(text,540,y+h/2-t.h/2+t.asc)})}
+
 // ================= stories =================
 const STORIES={
   'about-1':{total:210,init(){
@@ -154,6 +252,23 @@ const STORIES={
       if(f>=18&&f<44){const r=rng(11);for(let k=0;k<8;k++){const x=LOGO.x+r()*LOGO.w,y=LOGO.top+r()*LOGO.h,d=r()*14;
         const t=(f-18-d)/12;if(t>0&&t<1){const s=Math.ceil((t<.5?t:1-t)*16)*2;ctx.fillStyle=k%3?L:WH;ctx.fillRect(x-1,y-s,3,2*s);ctx.fillRect(x-s,y-1,2*s,3)}}}
       pop(f,92,540,1600,()=>card('فيديوهات · مواقع · تطبيقات · ترويج',540,1560));
+    }},
+  'about-2':{total:210,init(){
+      this.a=HL('الصورة مبكسلة؟',WH);this.b=HL('عدنا كل بكسل محسوب',L);
+      this.ta=269;this.tb=1141;this.tc=1331; // tuned: measured ink gaps 80/80/80
+    },draw(f){
+      const drop=frameScene(f);ctx.imageSmoothingEnabled=false;ctx.drawImage(pc,0,0,W,H);drawPicture(f,drop);
+      // «؟» inside the thought bubble (full-res type)
+      if(f>=36&&f<58){setFont('900 64px Kufi');ctx.fillStyle=N;ctx.fillText('؟',(154-2+11)*S,(HY2-30+17)*S)}
+      beatScale(f,100,540,this.ta+this.a.h/2,()=>pop(f,10,540,this.ta+this.a.h/2,()=>drawHL(this.a,540,this.ta)));
+      beatScale(f,100,540,this.tb+this.b.h/2,()=>pop(f,78,540,this.tb+this.b.h/2,()=>drawHL(this.b,540,this.tb)));
+      pop(f,90,540,this.tc+40,()=>card('يعني دقة واهتمام بكل تفصيلة',540,this.tc));
+    }},
+  'about-3':{total:240,init(){this.a=HL("شنو نسوي؟",WH);this.ta=275;this.tb=1306}, // tuned: ink gaps 80 (title→tiles, tiles→button)
+    draw(f){
+      selectScene(f);ctx.imageSmoothingEnabled=false;ctx.drawImage(pc,0,0,W,H);tileLabels(f);
+      beatScale(f,48,540,this.ta+this.a.h/2,()=>pop(f,4,540,this.ta+this.a.h/2,()=>drawHL(this.a,540,this.ta)));
+      pressButton('راسلنا بالخاص',f,100,this.tb);
     }},
 };
 let ST;

@@ -6,9 +6,12 @@ Public media host for **بكسلات | Pixelat** (Instagram @pixelat.iq). Metric
 - `reels/` — final reels
 - `stories/YYYY-MM-DD-{designed|repost}.{mp4|png}` — daily stories
 - `highlights/` — Instagram highlight covers (1080×1920, icon inside the centre circle) + `preview-profile.png`
+- `highlights/stories/` — the stories that go inside each highlight. «منو إحنا»: `about-1.mp4` → `about-2.mp4` → `about-3.mp4` → reel 17
+- `kit/highlight-anim.html`, `make_highlight_anim.js`, `highlight_audio.py` — animated highlight stories (pixel studio world, 7–8 s, 8-bit audio); `kit/assets/svc/` — service icons incl. the film-strip video icon
 - `brand/` — logo files (PNG/SVG), profile pictures, Facebook cover, merch mockups (`merch/`), bio texts (`bio.txt`)
 
 Render: `cd kit && NODE_PATH=$(npm root -g) node make_story.js designed <theme> <level> ../stories/x.mp4` (or `.png` for static), `node make_story.js repost ../reels/17.mp4 ../stories/y.mp4`.
+Highlight stories: `cd kit && NODE_PATH=$(npm root -g) node make_highlight_anim.js about-1 video ../highlights/stories/about-1.mp4` (or `frames <dir> 30,90,150` for stills to check).
 
 ## Reels
 
