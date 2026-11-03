@@ -3,6 +3,7 @@
 Public media host for **بكسلات | Pixelat** (Instagram @pixelat.iq). Metricool pulls story files from here by URL.
 
 - `kit/` — story generator (`make_story.js`, `story.html`, `story_audio.py`), brand fonts, original logo files (`kit/assets/`, never redraw), content bank (`content.json`), list of live reels (`published.json`)
+- `kit/pixelrun.js`, `make_pixelrun.js`, `pixelrun_audio.py` — 5 s original mini-game story (hero collects 12 pixels, counter counts them): `cd kit && NODE_PATH=$(npm root -g) node make_pixelrun.js ../stories/x.mp4`
 - `reels/` — final reels
 - `stories/YYYY-MM-DD-{designed|repost}.{mp4|png}` — daily stories
 - `highlights/` — Instagram highlight covers (1080×1920, icon inside the centre circle) + `preview-profile.png`
