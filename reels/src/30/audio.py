@@ -60,6 +60,7 @@ for k in range(9): add(sfx,F(92+k*4),blip(PENT[k%len(PENT)]-12,0.03,0.125),0.25)
 for k,fr in enumerate((114,129,144,159)):
     for j in range(3): add(sfx,F(fr+j),blip(PENT[(k+j*2)%len(PENT)],0.05,0.25),0.35)
 add(sfx,F(165),np.concatenate([blip(88,0.05),blip(93,0.12)]),0.6)
+add(sfx,F(167),np.concatenate([blip(79,0.07,0.25),blip(86,0.12,0.25)]),0.55)   # «شنو أسوّي هسه؟» pop
 # footsteps while walking
 for a0,b0 in ((190,220),(265,315),(355,405),(455,515)):
     for fr in range(a0,b0,8): add(sfx,F(fr),env(tri(hz(50),0.05),0.001,0.02),0.35)
