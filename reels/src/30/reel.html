@@ -61,19 +61,53 @@ function drawPortrait(g,f){
     phoneIcon(g,540,1330,ang,a);arcArrow(g,540,1330,150,a,clamp((f-46)/10));}
 }
 
-// ---------- landscape world (90–599) ----------
+// ---------- landscape world (90–599): a small hero walking through a pixel world ----------
 const Lc=document.createElement('canvas');Lc.width=LW;Lc.height=LH;const lg=Lc.getContext('2d');
-const U=36, HX=480, FLOOR=830;
+const U=20, FLOOR=860, HSX=560;           // hero cell size, ground line, hero's screen x while walking
 const SPR=[[".XX..XX.","XXXXXXXX","XXXXXXXX","..XXXX..","..XXXX..","..XXXX..","..XXXX..","........"],
  ["........","..XXXX..",".XXXXXX.",".XXXXXX.","XXXXXXXX","XXX.....","........","........"],
- ["..XXXX..",".X....X.","XXXXXXXX","XXXXXXXX","XXXXXXXX","XXXXXXXX","XXXXXXXX","........"],
- ["..XXX...","..XLX...",".XXXXX..","XAAAAAX.","XAWAAAX.","XAWAAAX.","XAAAAAX.",".XXXXX.."]];
+ ["..XXXX..",".X....X.","XXXXXXXX","XXXXXXXX","XXXXXXXX","XXXXXXXX","XXXXXXXX","........"]];
+const BOTTLE=["..NNN...","..NLN...",".NNNNN..","NAAAAAN.","NAWAAAN.","NAWAAAN.","NAAAAAN.",".NNNNN.."];
 function sprite(g,sp,x,y,u,col){
-  sp.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch!=='.')R(g,x+c*u-2,y+r*u-2,u+4,u+4,N)}));
-  sp.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='.'||ch==='X'&&false)return;const k=ch==='X'?col:ch==='A'?AM:ch==='W'?WH:ch==='L'?L:col;if(ch!=='.')R(g,x+c*u,y+r*u,u,u,ch==='X'&&sp===SPR[3]?N:k)}));
+  sp.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X')R(g,x+c*u-2,y+r*u-2,u+4,u+4,N)}));
+  sp.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='.')return;R(g,x+c*u,y+r*u,u,u,ch==='X'?col:ch==='N'?N:ch==='A'?AM:ch==='W'?WH:L)}));
 }
-// website (rendered once, revealed block by block)
-const WIN={x:760,y:280,w:760,h:520};
+// walking legs
+const WALK=[[".XX..X..",".X...XX."],["..X..XX.",".XX...X."]];
+function heroW(g,cx,bottom,u,o){
+  if(o.walk===undefined){hero(g,cx,bottom,u,o);return}
+  const body=BODY.slice(0,7).concat(WALK[o.walk]);
+  const x0=cx-4*u,y0=bottom-9*u,ov=Math.max(2,Math.round(u*0.28));
+  body.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X')R(g,x0+c*u-ov,y0+r*u-ov,u+2*ov,u+2*ov+4,N)}));
+  body.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X')R(g,x0+c*u,y0+r*u,u,u,L)}));
+  const ex=1+(o.look||0);[ex,ex+3].forEach(c=>R(g,x0+c*u,y0+2*u,u,2*u,N));
+}
+// ---- scenery ----
+const TREE=["...XXXX...","..XXXXXX..",".XXWXXXXX.","XXXXXXXXXX","XXXXXXWXXX","XXXXXXXXXX",".XXXXXXXX.","..XXXXXX..","....TT....","....TT....","....TT....","...TTTT..."];
+function tree(g,x,bottom,u,grow){
+  const h=TREE.length;g.save();g.translate(x,bottom);g.scale(1,grow);
+  TREE.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch!=='.')R(g,(c-5)*u-3,(r-h)*u-3,u+6,u+6,N)}));
+  TREE.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='.')return;R(g,(c-5)*u,(r-h)*u,u,u,ch==='T'?V:ch==='W'?'#F2FF9A':L)}));
+  g.restore();
+}
+function cloud(g,x,y,n){const s=40;R(g,x-4,y-4,n*s+8,s+8,N);R(g,x+s-4,y-s-4,(n-2)*s+8,s+8,N);R(g,x,y,n*s,s,WH);R(g,x+s,y-s,(n-2)*s,s,WH)}
+const TREES=[];{const r=rng(31);for(let x=-200;x<4400;x+=230+Math.floor(r()*170))TREES.push({x,u:r()<0.5?14:18})}
+const CLOUDS=[];{const r=rng(12);for(let x=-300;x<4400;x+=380+Math.floor(r()*260))CLOUDS.push({x,y:150+Math.floor(r()*300),n:3+Math.floor(r()*3)})}
+const BUSH=[];{const r=rng(5);for(let x=0;x<4600;x+=420+Math.floor(r()*300))BUSH.push(x)}
+
+// ---- path: world x of the hero, and the camera ----
+const STOP1=860, STOP2=1660, STOP3=2460, S1=STOP1+520, S2=STOP2+500, S3=STOP3+520;
+function heroX(f){
+  const seg=[[190,220,560,STOP1],[265,315,STOP1,STOP2],[355,405,STOP2,STOP3],[455,515,STOP3,STOP3+840]];
+  let x=560;for(const [a,b,x0,x1] of seg){if(f>=b)x=x1;else if(f>=a){x=x0+(x1-x0)*(f-a)/(b-a);break}}
+  return x;
+}
+const walking=f=>(f>=190&&f<220)||(f>=265&&f<315)||(f>=355&&f<405)||(f>=455&&f<515);
+const hsx=f=>HSX+(900-HSX)*easeInOut((f-500)/40);
+const camX=f=>heroX(f)-hsx(f);
+
+// ---- stations (world objects built from falling pixels) ----
+const WIN={w:760,h:520};
 const Sc=document.createElement('canvas');Sc.width=WIN.w;Sc.height=WIN.h;
 (function site(g){const w=WIN.w,h=WIN.h;
   R(g,0,0,w,h,WH);R(g,0,0,w,44,N);[L,WH,V].forEach((cc,i)=>R(g,w-30-i*24,15,14,14,cc));R(g,40,12,w-160,20,'#3A3A66');
@@ -83,100 +117,87 @@ const Sc=document.createElement('canvas');Sc.width=WIN.w;Sc.height=WIN.h;
     R(g,x,y,cw,150,LT);const u=Math.floor(cw*0.5/8);sprite(g,SPR[i],Math.round(x+cw/2-4*u),y+28,u,[L,PK,CY_][i]);
     R(g,x+cw-130,y+166,110,14,N);R(g,x+cw-90,y+190,70,12,V);R(g,x+12,y+214,cw-24,22,V);});
 })(Sc.getContext('2d'));
-const SBLK=[];{const r=rng(9);for(let y=0;y<WIN.h;y+=40)for(let x=0;x<WIN.w;x+=40){const band=Math.min(4,Math.floor(y/WIN.h*5));SBLK.push({x,y,t:186+band*15+(WIN.w-x)/WIN.w*5-8+r()*2})}}
-// app icons
+const SB1={w:500,h:342}; // billboard size on screen
+const B1=[];{const r=rng(9);const bs=40;for(let y=0;y<WIN.h;y+=bs)for(let x=0;x<WIN.w;x+=bs){const band=Math.min(4,Math.floor(y/WIN.h*5));B1.push({x,y,t:207+band*9+(WIN.w-x)/WIN.w*4+r()*2})}}
 const ICONS=[V,L,PK,CY_,AM,N,L,V,CY_,PK,AM,V];
-function appIcon(g,x,y,s,col,k){raised(g,x,y,s,s,col,4,6);const u=s/8,gl=col===L||col===AM||col===CY_?N:WH;
+function appIcon(g,x,y,s,col,k){raised(g,x,y,s,s,col,3,5);const u=s/8,gl=col===L||col===AM||col===CY_?N:WH;
   const G=[[[2,2,4,4]],[[3,1,2,6],[1,3,6,2]],[[2,2,4,1],[2,4,4,1],[2,6,3,1]],[[2,2,4,4],[3,3,2,2,col]],[[2,5,1,1],[3,4,1,1],[4,3,1,1],[5,2,1,1]],[[1,3,6,2]]][k%6];
   G.forEach(q=>R(g,x+q[0]*u,y+q[1]*u,q[2]*u,q[3]*u,q[4]||gl));}
-function heart(g,cx,cy,u,col){const P=[".XX.XX.","XXXXXXX","XXXXXXX",".XXXXX.","..XXX..","...X..."];
+function heartP(g,cx,cy,u,col){const P=[".XX.XX.","XXXXXXX","XXXXXXX",".XXXXX.","..XXX..","...X..."];
   P.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X')R(g,cx-3.5*u+c*u-3,cy-3*u+r*u-3,u+6,u+6,N)}));
   P.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X')R(g,cx-3.5*u+c*u,cy-3*u+r*u,u,u,col)}));}
-// ad card (rendered fresh each frame because of the like state)
-function adCard(g,x,y,w,h,f){
-  raised(g,x,y,w,h,WH,8,14);
-  R(g,x+24,y+22,56,56,L);hero(g,x+52,y+72,6,{});R(g,x+96,y+30,170,16,N);R(g,x+96,y+56,110,12,'#8A7FB8');
-  R(g,x+24,y+98,w-48,380,V);
-  const b=Math.sin(f/7)*8;sprite(g,SPR[3],x+w/2-112,y+150+b,32,AM);
-  const liked=f>=390;const hp=liked&&(f-390)%15<5?1.25:1;
-  g.save();g.translate(x+60,y+530);g.scale(hp,hp);heart(g,0,0,8,liked?L:WH);g.restore();
-  R(g,x+120,y+508,46,40,N);R(g,x+126,y+514,34,22,WH);R(g,x+186,y+512,40,8,N);R(g,x+202,y+500,8,32,N);
-  R(g,x+24,y+580,w-140,16,N);R(g,x+24,y+610,w-220,12,'#8A7FB8');
+function posts(g,cx,top,bottom,gap){[cx-gap,cx+gap-16].forEach(x=>{R(g,x-4,top,24,bottom-top,N);R(g,x,top,16,bottom-top,'#3A3A66')})}
+function station1(g,f){ // website billboard
+  if(f<200)return;const cx=S1,bw=SB1.w,bh=SB1.h,x=cx-bw/2,y=FLOOR-120-bh;
+  posts(g,cx,y+bh,FLOOR,150);raised(g,x,y,bw,bh,N,7,12);
+  const k=bw/WIN.w;for(const b of B1){if(f<b.t)continue;const d=(b.t+7-f)>0?Math.pow((b.t+7-f)/7,2)*-300:0;
+    g.drawImage(Sc,b.x,b.y,40,40,x+b.x*k,y+b.y*k+d,40*k+0.5,40*k+0.5)}
 }
-// climax: violet fill grows from the hero outwards, banded on the beats
-const FT=[];{const g=60,cx=900,cy=600,maxd=Math.hypot(1100,640);for(let y=0;y<LH;y+=g)for(let x=0;x<LW;x+=g){const d=Math.hypot(x+30-cx,y+30-cy)/maxd;const band=Math.min(4,Math.floor(d*5));FT.push({x,y,t:463+band*15+(d*5-band)*8})}}
-// card shatter tiles
-const SH=[];{const r=rng(4);for(let y=0;y<700;y+=50)for(let x=0;x<520;x+=50)SH.push({x,y,vx:(x-260)/18+(r()-.5)*10,vy:(y-350)/22-8+(r()-.5)*8,rot:(r()-.5)*.4})}
-const Cc=document.createElement('canvas');Cc.width=560;Cc.height=740;
+function station2(g,f){ // phone with app icons
+  if(f<290)return;const cx=S2,pw=230,ph=420,x=cx-pw/2,y=FLOOR-ph-30;
+  const a=easeOut((f-290)/10);const yy=y-(1-a)*500;
+  R(g,cx-60,FLOOR-34,120,34,N);R(g,cx-52,FLOOR-30,104,26,'#3A3A66');
+  raised(g,x,yy,pw,ph,N,7,12);R(g,x+12,yy+12,pw-24,ph-24,'#F4F1FF');R(g,cx-30,yy+18,60,10,N);
+  for(let i=0;i<12;i++){const st=300+i*4;if(f<st)continue;const s=52*(f-st<5?backOut((f-st)/5):1);const col=i%3,row=Math.floor(i/3);
+    appIcon(g,x+24+col*64+26-s/2,yy+48+row*72+26-s/2,s,ICONS[i],i)}
+  if(f>=348)for(let i=0;i<4;i++)appIcon(g,x+22+i*48,yy+ph-62,36,[V,L,PK,CY_][i],i+2);
+}
+function adCard(g,x,y,w,h,f){
+  raised(g,x,y,w,h,WH,7,12);R(g,x+18,y+16,40,40,L);hero(g,x+38,y+52,4,{});R(g,x+70,y+22,120,12,N);R(g,x+70,y+42,80,10,'#8A7FB8');
+  R(g,x+18,y+72,w-36,240,V);const b=Math.sin(f/7)*6;sprite(g,BOTTLE,x+w/2-88,y+110+b,22,AM);
+  const liked=f>=410;const hp=liked&&(f-410)%15<5?1.25:1;
+  g.save();g.translate(x+44,y+352);g.scale(hp,hp);heartP(g,0,0,6,liked?L:WH);g.restore();
+  R(g,x+90,y+336,34,30,N);R(g,x+95,y+341,24,16,WH);R(g,x+140,y+344,30,6,N);R(g,x+152,y+334,6,26,N);
+  R(g,x+18,y+390,w-90,12,N);R(g,x+18,y+412,w-150,10,'#8A7FB8');
+}
+function station3(g,f){ // ad post on posts
+  if(f<380)return;const cx=S3,w=330,h=440,x=cx-w/2,y=FLOOR-90-h;
+  posts(g,cx,y+h,FLOOR,90);
+  const fl=easeOut((f-380)/12);g.save();g.translate(cx,y+h/2);g.scale(Math.max(0.01,fl),1);g.translate(-cx,-(y+h/2));adCard(g,x,y,w,h,f);g.restore();
+  for(let k=0;k<5;k++){const s=410+k*15;if(f<s)continue;const t=(f-s)/30;if(t>1)continue;heartP(g,x+44+Math.sin(t*6+k)*26,y+352-t*380,5,k%2?L:WH)}
+}
+// climax: the sky turns brand violet, growing from the hero, banded on the beats
+const FT=[];{const g=60,maxd=Math.hypot(1400,800);for(let y=0;y<LH;y+=g)for(let x=0;x<LW;x+=g){const d=Math.hypot(x+30-HSX-140,y+30-760)/maxd;const band=Math.min(4,Math.floor(d*5));FT.push({x,y,t:465+band*15+(d*5-band)*8})}}
 
 function heroState(f){
-  const st={x:HX,b:FLOOR,o:{}};
-  if(f>=165&&f<172)st.o.blink=1;
-  if(f>=172&&f<178)st.o.look=-1;else if(f>=178&&f<186)st.o.look=1;
-  if(f>=150&&f<180)st.o.look=st.o.look||0;
-  // clap hop at 180, look at the site while it builds
-  if(f>=180&&f<192){const t=(f-180)/12;st.b-=Math.sin(t*Math.PI)*60;st.o.jump=1}
-  if(f>=192&&f<270){st.o.look=1;const k=(f-186)%15;if(k<5)st.b-=Math.sin(k/5*Math.PI)*14}
-  // jump onto the window top (270–284), ride the squeeze, hop back (300–314)
-  if(f>=270&&f<284){const t=(f-270)/14;st.x=HX+(1140-HX)*t;st.b=FLOOR+(WIN.y-6-FLOOR)*t-Math.sin(t*Math.PI)*220;st.o.jump=1}
-  else if(f>=284&&f<300){const t=easeInOut((f-286)/14);st.x=1140;st.b=WIN.y-6+(236-6-WIN.y+6)*t;if(f<288){st.o.sy=0.8;st.o.sx=1.15}}
-  else if(f>=300&&f<314){const t=(f-300)/14;st.x=1140+(620-1140)*t;st.b=230+(FLOOR-230)*t-Math.sin(t*Math.PI)*160;st.o.jump=1}
-  else if(f>=314&&f<450){st.x=620;st.o.look=1;if(f>=372){const k=(f-375+15)%15;if(k<7){st.b-=Math.sin(k/7*Math.PI)*40;st.o.jump=1}}if(f>=390)st.o.smile=1}
-  // to the centre for the finale
-  if(f>=450&&f<470){const t=(f-450)/20;st.x=620+(900-620)*t;st.b=FLOOR+(760-FLOOR)*t-Math.sin(t*Math.PI)*200;st.o.jump=1;st.o.smile=1}
-  else if(f>=470){st.x=900;st.b=760;st.o.smile=1;if(f>=552&&f<556)st.o.blink=1;if(f>=566)st.o.wink=1;
-    const k=(f-570)%30;if(f>=570&&k<8){st.b-=Math.sin(k/8*Math.PI)*50;st.o.jump=1}}
+  const st={b:FLOOR,o:{look:1}};
+  if(f>=165&&f<172){st.o.blink=1;st.o.look=0}
+  else if(f>=172&&f<178)st.o.look=-1;else if(f>=178&&f<190)st.o.look=1;
+  if(walking(f)){st.o.walk=Math.floor(f/4)%2;st.b-=(Math.floor(f/4)%2)*4}
+  // watch each station build: little hops on the beats
+  const watch=(f>=225&&f<262)||(f>=318&&f<352)||(f>=408&&f<452);
+  if(watch){const k=(f-225)%15;if(k<6){st.b-=Math.sin(k/6*Math.PI)*24;st.o.jump=1}}
+  if(f>=410&&f<455)st.o.smile=1;
+  if(f>=515){st.o={look:0,smile:1};if(f>=552&&f<556)st.o.blink=1;if(f>=566)st.o.wink=1;
+    const k=(f-570)%30;if(f>=570&&k<8){st.b-=Math.sin(k/8*Math.PI)*40;st.o.jump=1;st.o.smile=1}}
   return st;
 }
 function drawLand(f){
-  const g=lg;const filled=f>=540;
-  R(g,0,0,LW,LH,filled?V:N);
-  const p=pulse(f);g.globalAlpha=(filled?0.08:0.06)*p;for(let y=0;y<LH;y+=60)for(let x=0;x<LW;x+=60)if(((x+y)/60)%2===0)R(g,x,y,60,60,filled?N:V);g.globalAlpha=1;
-  // floor (game feel) until the fill swallows it
-  if(f>=150&&f<540){const a=clamp((f-150)/10);g.globalAlpha=a;for(let x=0;x<LW;x+=60){R(g,x,FLOOR+6,60,LH,N);R(g,x+3,FLOOR+9,54,16,L)}g.globalAlpha=1}
-  // ---- website / phone / ad (centre stage x≈1140) ----
-  if(f>=180&&f<286){ // window builds then holds
-    const sq=f>=284?0:0;raised(g,WIN.x,WIN.y,WIN.w,WIN.h,N,7,14);
-    for(const b of SBLK){if(f<b.t)continue;const d=(b.t+8-f)>0?Math.pow((b.t+8-f)/8,2)*-260:0;g.drawImage(Sc,b.x,b.y,40,40,WIN.x+b.x,WIN.y+b.y+d,40,40)}
-  }
-  if(f>=284&&f<372){ // squeeze into a phone, icons pop
-    const t=easeInOut((f-286)/14);const w=WIN.w+(340-WIN.w)*t,h=WIN.h+(620-WIN.h)*t,x=1140-w/2,y=WIN.y+(236-WIN.y)*t;
-    const fl=f>=360?Math.cos(clamp((f-360)/12)*Math.PI/2):1; // flip out
-    g.save();g.translate(1140,y+h/2);g.scale(Math.max(0.01,fl),1);g.translate(-1140,-(y+h/2));
-    raised(g,x,y,w,h,N,7,14);R(g,x+16,y+16,w-32,h-32,t<1?WH:'#F4F1FF');
-    if(t<1){g.globalAlpha=1-t;g.drawImage(Sc,0,0,WIN.w,WIN.h,x+16,y+16,w-32,h-32);g.globalAlpha=1}
-    else{R(g,1140-40,y+24,80,14,N);
-      for(let i=0;i<12;i++){const st=304+i*4;if(f<st)continue;const s=76*(f-st<5?backOut((f-st)/5):1);const col=i%3,row=Math.floor(i/3);
-        const ix=x+40+col*92+38,iy=y+80+row*100+38;appIcon(g,ix-s/2,iy-s/2,s,ICONS[i],i)}
-      R(g,x+28,y+h-96,w-56,64,'#E2DBFF');for(let i=0;i<4;i++)if(f>=352)appIcon(g,x+44+i*68,y+h-88,48,[V,L,PK,CY_][i],i+2)}
-    g.restore();
-  }
-  if(f>=372&&f<462){ // ad card flips in, hearts fly
-    const fl=easeOut((f-372)/12);const x=1140-260,y=190;
-    if(f<450){g.save();g.translate(1140,y+350);g.scale(Math.max(0.01,fl),1);g.translate(-1140,-(y+350));adCard(g,x,y,520,700,f);g.restore();
-      for(let k=0;k<4;k++){const s=390+k*15;if(f<s)continue;const t=(f-s)/30;if(t>1)continue;heart(g,x+60+Math.sin(t*6+k)*30,y+530-t*420,6,k%2?L:WH)}}
-    else{ // shatter
-      const cg=Cc.getContext('2d');cg.clearRect(0,0,560,740);adCard(cg,20,10,520,700,449);const t=f-450+1;
-      for(const s of SH){const sc=Math.max(0,1-t*0.08);if(sc<=0)continue;g.save();g.translate(x+s.x+25+s.vx*t*1.4,y+s.y+25+s.vy*t*1.4+t*t*1.5);g.rotate(s.rot*t);g.scale(sc,sc);g.drawImage(Cc,20+s.x,10+s.y,50,50,-25,-25,50,50);g.restore()}}
-  }
-  // ---- violet fill from the hero outwards ----
-  if(f>=455&&f<540){for(const t of FT){const k=(f-t.t)/6;if(k<=0)continue;const s=Math.ceil(60*Math.min(1,k));
-      R(g,t.x+30-s/2,t.y+30-s/2,s,s,k<1?L:V);if(k<1.6&&k>=1)R(g,t.x,t.y,60,4,L)}}
+  const g=lg;const cam=camX(f);
+  // sky: navy, turning violet from the hero outwards at the climax
+  const done=f>=540;R(g,0,0,LW,LH,done?V:N);
+  if(f>=460&&!done)for(const t of FT){const k=(f-t.t)/6;if(k<=0)continue;const s=Math.ceil(60*Math.min(1,k));R(g,t.x+30-s/2,t.y+30-s/2,s,s,k<1?L:V)}
+  const p=pulse(f);g.globalAlpha=0.06*p;for(let y=0;y<FLOOR;y+=60)for(let x=0;x<LW;x+=60)if(((x+y)/60)%2===0)R(g,x,y,60,60,done?N:V);g.globalAlpha=1;
+  // world builds in on the beats (90–130): clouds slide, trees grow, ground lays left→right
+  const wb=t=>clamp((f-t)/8);
+  for(const cl of CLOUDS){const sx=cl.x-cam*0.3+f*0.4;const xx=((sx%2600)+2600)%2600-300;const a=wb(96+((xx/LW)*16|0));
+    if(a>0)cloud(g,xx-(1-a)*120,cl.y,cl.n)}
+  for(const t of TREES){const sx=t.x-cam*0.7;if(sx<-200||sx>LW+200)continue;const a=easeOut(wb(100+((Math.max(0,sx)/LW)*20|0)));if(a>0)tree(g,sx,FLOOR,t.u,a)}
+  // stations (in world space, 1:1 with the ground)
+  g.save();g.translate(-cam,0);station1(g,f);station2(g,f);station3(g,f);g.restore();
+  // ground
+  for(let x=-((cam%40)+40)%40-40;x<LW+40;x+=40){const wx=x+cam;const a=wb(92+((Math.max(0,x)/LW)*18|0));if(a<=0)continue;
+    R(g,x,FLOOR+(1-a)*200,40,LH-FLOOR,N);R(g,x+2,FLOOR+(1-a)*200+2,36,12,L);if(((wx/40)|0)%3===0)R(g,x+8,FLOOR+40,14,14,'#2E2E5C')}
+  for(const bx of BUSH){const sx=bx-cam*1.0;if(sx<-100||sx>LW+100)continue;if(wb(104)<=0)continue;R(g,sx-4,FLOOR-34,88,38,N);R(g,sx,FLOOR-30,80,30,L);R(g,sx+16,FLOOR-46,48,20,N);R(g,sx+20,FLOOR-42,40,16,L)}
   // ---- hero ----
-  if(f<165){ // assembly: the lone pixel slides into its slot, the rest fall in on the beats
-    const x0=HX-4*U,y0=FLOOR-9*U;
+  if(f<165){const x0=HSX-4*U,y0=FLOOR-9*U;
     HCELLS.forEach(([c,r],i)=>{let tx=x0+c*U,ty=y0+r*U;
-      if(c===3&&r===4){const t=easeInOut((f-90)/12);cell(g,960-U/2+(tx-960+U/2)*t,540-U/2+(ty-540+U/2)*t,U,L);return}
-      const beat=Math.floor(i/HCELLS.length*5),land=99+beat*15+(i%5),st=land-10;if(f<st)return;
-      const t=clamp((f-st)/10);const sx=tx+((i*137)%600-300)*(1-t),sy=-80+(ty+80)*t*t;cell(g,sx,sy,U,L)});
-  } else {
-    const hs=heroState(f);let U2=U;if(f>=540){U2=U+12*easeOut((f-540)/10)}
-    if(f<170&&f>=165){/* eyes appear: blink */}
-    hero(g,hs.x,hs.b,U2,hs.o);
-    if(f>=180&&f<190){g.fillStyle=WH;for(let i=0;i<6;i++){const a=i/6*Math.PI*2,r=(f-180)*9;R(g,hs.x+Math.cos(a)*(120+r)-8,hs.b-170+Math.sin(a)*(120+r)-8,16,16,WH)}}
-  }
-  // ---- finale: blinking pixel arrow toward the caption (no words) ----
-  if(f>=572&&Math.floor((f-572)/8)%2===0){const ax=1230,ay=560;for(let i=0;i<4;i++)cell(g,ax+i*36,ay-14,28,L);for(let i=1;i<4;i++){cell(g,ax+108-i*36,ay-14-i*36,28,L);cell(g,ax+108-i*36,ay-14+i*36,28,L)}}
+      if(c===3&&r===4){const t=easeInOut((f-90)/12);const s=36+(U-36)*t;cell(g,960-18+(tx-960+18)*t,540-18+(ty-540+18)*t,s,L);return}
+      const beat=Math.floor(i/HCELLS.length*4),land=114+beat*15+(i%5),st=land-10;if(f<st)return;
+      const t=clamp((f-st)/10);cell(g,tx+((i*137)%500-250)*(1-t),-60+(ty+60)*t*t,U,L)});
+  } else {const hs=heroState(f);heroW(g,hsx(f),hs.b,U,hs.o)}
+  // finale arrow toward the caption (no words)
+  if(f>=572&&Math.floor((f-572)/8)%2===0){const ax=hsx(f)+130,ay=FLOOR-100;for(let i=0;i<3;i++)cell(g,ax+i*26,ay,20,L);for(let i=1;i<3;i++){cell(g,ax+52-i*26,ay-i*26,20,L);cell(g,ax+52-i*26,ay+i*26,20,L)}}
 }
 
 function draw(f){

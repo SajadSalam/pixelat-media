@@ -53,28 +53,30 @@ add(music,18.0,crash(),0.5)
 add(music,19.5,kick(),0.9);add(music,19.5,crash(0.5),0.4)
 for m in (57,60,64,69): add(music,19.5,env(pulse(hz(m+12),0.5,0.5),0.003,0.25),0.07)
 
-# hero assembly: a chord of blips per landing cluster + eyes "ding"
-for k,fr in enumerate((99,114,129,144,159)):
+# world draws itself (ground left→right, trees, clouds)
+for k in range(9): add(sfx,F(92+k*4),blip(PENT[k%len(PENT)]-12,0.03,0.125),0.25)
+# hero assembly: blip chords per landing cluster + eyes "ding"
+for k,fr in enumerate((114,129,144,159)):
     for j in range(3): add(sfx,F(fr+j),blip(PENT[(k+j*2)%len(PENT)],0.05,0.25),0.35)
 add(sfx,F(165),np.concatenate([blip(88,0.05),blip(93,0.12)]),0.6)
-# website: clap, block bands
-add(sfx,F(180),env(noise(0.08),0.001,0.03),0.8)
-for k,fr in enumerate((186,201,216,231,246)):
-    for j in range(4): add(sfx,F(fr)+j*0.04,blip(76+k*2+j,0.03,0.125),0.25)
-# app: jump, land, squeeze, hop, icons
-add(sfx,F(270),sweep(64,79,0.25),0.6); add(sfx,F(284),env(tri(110,0.12),0.001,0.05),0.8)
-add(sfx,F(286),sweep(84,60,0.35,0.25),0.4); add(sfx,F(300),sweep(64,79,0.22),0.5)
-for i in range(12): add(sfx,F(304+i*4),blip(PENT[i%len(PENT)],0.04,0.25),0.3)
-# ad: flip, hearts (coins)
-add(sfx,F(360),whoosh(0.35),0.5)
-for fr in (390,405,420,435): add(sfx,F(fr),np.concatenate([blip(83,0.06),env(pulse(hz(88),0.22,0.5),0.001,0.1)]),0.7)
-# climax: shatter + rising fill sweeps
-add(sfx,F(450),env(noise(0.4),0.001,0.15),0.8)
-for k,fr in enumerate((463,478,493,508,523)): add(sfx,F(fr),sweep(60+k*4,72+k*4,0.3,0.25),0.4)
+# footsteps while walking
+for a0,b0 in ((190,220),(265,315),(355,405),(455,515)):
+    for fr in range(a0,b0,8): add(sfx,F(fr),env(tri(hz(50),0.05),0.001,0.02),0.35)
+# station 1: website blocks land in bands
+for k,fr in enumerate((207,216,225,234,243)):
+    for j in range(4): add(sfx,F(fr+7)+j*0.03,blip(76+k*2+j,0.03,0.125),0.25)
+# station 2: phone drops, icons pop
+add(sfx,F(290),sweep(84,60,0.3,0.25),0.4); add(sfx,F(300),env(tri(110,0.12),0.001,0.05),0.7)
+for i in range(12): add(sfx,F(300+i*4),blip(PENT[i%len(PENT)],0.04,0.25),0.3)
+add(sfx,F(348),blip(91,0.06),0.4)
+# station 3: ad flips in, likes (coins)
+add(sfx,F(380),whoosh(0.35),0.5)
+for fr in (410,425,440,455,470): add(sfx,F(fr),np.concatenate([blip(83,0.06),env(pulse(hz(88),0.22,0.5),0.001,0.1)]),0.6)
+# climax: the sky turns violet in rising sweeps
+for k,fr in enumerate((465,480,495,510,525)): add(sfx,F(fr),sweep(60+k*4,72+k*4,0.3,0.25),0.4)
 # finale: blink, wink, hops, arrow ticks
 add(sfx,F(552),blip(90,0.04),0.4); add(sfx,F(566),np.concatenate([blip(84,0.05),blip(91,0.15)]),0.6)
-for fr in (570,600-0): 
-    if fr<600: add(sfx,F(fr),sweep(67,79,0.18),0.4)
+add(sfx,F(570),sweep(67,79,0.18),0.4)
 for fr in range(572,600,16): add(sfx,F(fr),blip(96,0.03,0.125),0.25)
 
 music/=np.max(np.abs(music)); sfx/=np.max(np.abs(sfx))
