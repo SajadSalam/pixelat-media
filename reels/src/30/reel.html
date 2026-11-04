@@ -1,5 +1,6 @@
 <!doctype html>
-<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#232347}canvas{display:block}</style></head>
+<html><head><meta charset="utf-8"><style>@font-face{font-family:Kufi;font-weight:900;src:url(fonts/noto-kufi-arabic-arabic-900-normal.woff2) format('woff2')}
+html,body{margin:0;background:#232347}canvas{display:block}</style></head>
 <body><canvas id="c" width="1080" height="1920"></canvas>
 <script>
 // Reel 19 «رحلة البكسل» — motion only, no words. Portrait 0–3 s, then the frame turns to landscape.
@@ -127,6 +128,14 @@ function heartP(g,cx,cy,u,col){const P=[".XX.XX.","XXXXXXX","XXXXXXX",".XXXXX.",
   P.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X')R(g,cx-3.5*u+c*u-3,cy-3*u+r*u-3,u+6,u+6,N)}));
   P.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X')R(g,cx-3.5*u+c*u,cy-3*u+r*u,u,u,col)}));}
 function posts(g,cx,top,bottom,gap){[cx-gap,cx+gap-16].forEach(x=>{R(g,x-4,top,24,bottom-top,N);R(g,x,top,16,bottom-top,'#3A3A66')})}
+// step labels: short lime Kufi headline with navy outline + extrude, pops on the beat
+function label(g,text,cx,y,f,start,end){
+  if(f<start||f>=end)return;const t=(f-start)/7,sc=t>=1?1:Math.max(0.01,backOut(t));const fade=end-f<8?(end-f)/8:1;
+  g.save();g.globalAlpha=fade;g.translate(cx,y);g.scale(sc,sc);
+  g.font='900 64px Kufi';g.direction='rtl';g.textAlign='center';g.textBaseline='alphabetic';g.lineJoin='miter';g.miterLimit=2;
+  g.fillStyle=N;g.strokeStyle=N;g.lineWidth=10;for(let k=7;k>=1;k--){g.strokeText(text,0,k);g.fillText(text,0,k)}
+  g.strokeText(text,0,0);g.fillStyle=L;g.fillText(text,0,0);g.restore();
+}
 function station1(g,f){ // website billboard
   if(f<200)return;const cx=S1,bw=SB1.w,bh=SB1.h,x=cx-bw/2,y=FLOOR-120-bh;
   posts(g,cx,y+bh,FLOOR,150);raised(g,x,y,bw,bh,N,7,12);
@@ -187,7 +196,11 @@ function drawLand(f){
     if(a>0)cloud(g,xx-(1-a)*120,cl.y,cl.n)}
   for(const t of TREES){const sx=t.x-cam*0.7;if(sx<-200||sx>LW+200)continue;const a=easeOut(wb(100+((Math.max(0,sx)/LW)*20|0)));if(a>0)tree(g,sx,FLOOR,t.u,a)}
   // stations (in world space, 1:1 with the ground)
-  g.save();g.translate(-cam,0);station1(g,f);station2(g,f);station3(g,f);g.restore();
+  g.save();g.translate(-cam,0);station1(g,f);station2(g,f);station3(g,f);
+  label(g,'نبنيلك موقع',S1,FLOOR-120-SB1.h-46,f,210,302);
+  label(g,'نسويلك تطبيق',S2,FLOOR-30-420-46,f,300,392);
+  label(g,'نروّج لمشروعك',S3,FLOOR-90-440-46,f,390,460);
+  g.restore();
   // ground
   for(let x=-((cam%40)+40)%40-40;x<LW+40;x+=40){const wx=x+cam;const a=wb(92+((Math.max(0,x)/LW)*18|0));if(a<=0)continue;
     R(g,x,FLOOR+(1-a)*200,40,LH-FLOOR,N);R(g,x+2,FLOOR+(1-a)*200+2,36,12,L);if(((wx/40)|0)%3===0)R(g,x+8,FLOOR+40,14,14,'#2E2E5C')}
@@ -212,5 +225,5 @@ function draw(f){
     ctx.restore();return}
   drawLand(f);ctx.save();ctx.translate(1080,0);ctx.rotate(Math.PI/2);ctx.drawImage(Lc,0,0);ctx.restore();
 }
-window.draw=draw;window.TOTAL=TOTAL;window.ready=true;
+document.fonts.load('900 64px Kufi','نبنيلك موقع').then(()=>{window.draw=draw;window.TOTAL=TOTAL;window.ready=true;});
 </script></body></html>

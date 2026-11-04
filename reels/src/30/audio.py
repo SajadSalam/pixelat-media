@@ -63,6 +63,7 @@ add(sfx,F(165),np.concatenate([blip(88,0.05),blip(93,0.12)]),0.6)
 # footsteps while walking
 for a0,b0 in ((190,220),(265,315),(355,405),(455,515)):
     for fr in range(a0,b0,8): add(sfx,F(fr),env(tri(hz(50),0.05),0.001,0.02),0.35)
+for fr in (210,300,390): add(sfx,F(fr),blip(88,0.07,0.25),0.45)   # label pops
 # station 1: website blocks land in bands
 for k,fr in enumerate((207,216,225,234,243)):
     for j in range(4): add(sfx,F(fr+7)+j*0.03,blip(76+k*2+j,0.03,0.125),0.25)
