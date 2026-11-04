@@ -5,7 +5,7 @@ html,body{margin:0;background:#232347}canvas{display:block}</style></head>
 <body><canvas id="c" width="1080" height="1920"></canvas>
 <script>
 // Reel 19 «رحلة البكسل» — motion only, no words. Portrait 0–3 s, then the frame turns to landscape.
-const W=1080,H=1920,LW=1920,LH=1080,BEAT=15,TOTAL=510;
+const W=1080,H=1920,LW=900,LH=1600,SC=1.2,BEAT=15,TOTAL=510; // vertical: world drawn in 900x1600 units, scaled x1.2
 const V='#612AFF',L='#E0FF38',N='#232347',WH='#FFFFFF';
 const LT='#EEEAFB',PK='#FF7AB6',CY_='#5BD1FF',AM='#FFB547';
 const c=document.getElementById('c'),ctx=c.getContext('2d');
@@ -64,8 +64,8 @@ function drawPortrait(g,f){
 }
 
 // ---------- landscape world (90–599): a small hero walking through a pixel world ----------
-const Lc=document.createElement('canvas');Lc.width=LW;Lc.height=LH;const lg=Lc.getContext('2d');
-const U=20, FLOOR=860, HSX=560;           // hero cell size, ground line, hero's screen x while walking
+const Lc=document.createElement('canvas');Lc.width=W;Lc.height=H;const lg=Lc.getContext('2d');
+const U=20, FLOOR=1150, HSX=190;           // hero cell size, ground line, hero's screen x while walking
 const SPR=[[".XX..XX.","XXXXXXXX","XXXXXXXX","..XXXX..","..XXXX..","..XXXX..","..XXXX..","........"],
  ["........","..XXXX..",".XXXXXX.",".XXXXXX.","XXXXXXXX","XXX.....","........","........"],
  ["..XXXX..",".X....X.","XXXXXXXX","XXXXXXXX","XXXXXXXX","XXXXXXXX","XXXXXXXX","........"]];
@@ -94,18 +94,18 @@ function tree(g,x,bottom,u,grow){
 }
 function cloud(g,x,y,n){const s=40;R(g,x-4,y-4,n*s+8,s+8,N);R(g,x+s-4,y-s-4,(n-2)*s+8,s+8,N);R(g,x,y,n*s,s,WH);R(g,x+s,y-s,(n-2)*s,s,WH)}
 const TREES=[];{const r=rng(31);for(let x=-200;x<4400;x+=230+Math.floor(r()*170))TREES.push({x,u:r()<0.5?14:18})}
-const CLOUDS=[];{const r=rng(12);for(let x=-300;x<4400;x+=380+Math.floor(r()*260))CLOUDS.push({x,y:150+Math.floor(r()*300),n:3+Math.floor(r()*3)})}
+const CLOUDS=[];{const r=rng(12);for(let x=-300;x<4400;x+=380+Math.floor(r()*260))CLOUDS.push({x,y:190+Math.floor(r()*560),n:3+Math.floor(r()*3)})}
 const BUSH=[];{const r=rng(5);for(let x=0;x<4600;x+=420+Math.floor(r()*300))BUSH.push(x)}
 
 // ---- path: world x of the hero, and the camera ----
-const STOP1=860, STOP2=1660, STOP3=2460, S1=STOP1+520, S2=STOP2+500, S3=STOP3+520;
+const STOP1=860, STOP2=1660, STOP3=2460, S1=STOP1+330, S2=STOP2+330, S3=STOP3+330;
 function heroX(f){
-  const seg=[[190,220,560,STOP1],[265,315,STOP1,STOP2],[355,405,STOP2,STOP3],[455,515,STOP3,STOP3+840]];
+  const seg=[[190,220,560,STOP1],[265,315,STOP1,STOP2],[355,405,STOP2,STOP3],[455,515,STOP3,STOP3+560]];
   let x=560;for(const [a,b,x0,x1] of seg){if(f>=b)x=x1;else if(f>=a){x=x0+(x1-x0)*(f-a)/(b-a);break}}
   return x;
 }
 const walking=f=>(f>=190&&f<220)||(f>=265&&f<315)||(f>=355&&f<405)||(f>=455&&f<515);
-const hsx=f=>HSX+(900-HSX)*easeInOut((f-500)/40);
+const hsx=f=>HSX+(450-HSX)*easeInOut((f-500)/40);
 const camX=f=>heroX(f)-hsx(f);
 
 // ---- stations (world objects built from falling pixels) ----
@@ -119,7 +119,7 @@ const Sc=document.createElement('canvas');Sc.width=WIN.w;Sc.height=WIN.h;
     R(g,x,y,cw,150,LT);const u=Math.floor(cw*0.5/8);sprite(g,SPR[i],Math.round(x+cw/2-4*u),y+28,u,[L,PK,CY_][i]);
     R(g,x+cw-130,y+166,110,14,N);R(g,x+cw-90,y+190,70,12,V);R(g,x+12,y+214,cw-24,22,V);});
 })(Sc.getContext('2d'));
-const SB1={w:500,h:342}; // billboard size on screen
+const SB1={w:460,h:315}; // billboard size on screen
 const B1=[];{const r=rng(9);const bs=40;for(let y=0;y<WIN.h;y+=bs)for(let x=0;x<WIN.w;x+=bs){const band=Math.min(4,Math.floor(y/WIN.h*5));B1.push({x,y,t:207+band*9+(WIN.w-x)/WIN.w*4+r()*2})}}
 const ICONS=[V,L,PK,CY_,AM,N,L,V,CY_,PK,AM,V];
 function appIcon(g,x,y,s,col,k){raised(g,x,y,s,s,col,3,5);const u=s/8,gl=col===L||col===AM||col===CY_?N:WH;
@@ -168,7 +168,7 @@ function station3(g,f){ // ad post on posts
 }
 const SKY=[];{for(let y=0;y<LH;y+=60)for(let x=0;x<LW;x+=60){const band=Math.min(2,Math.floor(x/LW*3));SKY.push({x,y,t:86+band*10+(x/LW*3-band)*6+(y/LH)*3})}}
 // climax: the sky turns brand violet, growing from the hero, banded on the beats
-const FT=[];{const g=60,maxd=Math.hypot(1400,800);for(let y=0;y<LH;y+=g)for(let x=0;x<LW;x+=g){const d=Math.hypot(x+30-HSX-140,y+30-760)/maxd;const band=Math.min(4,Math.floor(d*5));FT.push({x,y,t:465+band*15+(d*5-band)*8})}}
+const FT=[];{const g=60,maxd=Math.hypot(900,1500);for(let y=0;y<LH;y+=g)for(let x=0;x<LW;x+=g){const d=Math.hypot(x+30-330,y+30-(FLOOR-150))/maxd;const band=Math.min(4,Math.floor(d*5));FT.push({x,y,t:465+band*15+(d*5-band)*8})}}
 
 function heroState(f){
   const st={b:FLOOR,o:{look:1}};
@@ -184,7 +184,7 @@ function heroState(f){
   return st;
 }
 function drawLand(f){
-  const g=lg;const cam=camX(f);
+  const g=lg;g.setTransform(SC,0,0,SC,0,0);const cam=camX(f);
   // sky: navy, turning violet from the hero outwards at the climax
   // sky paints itself brand violet as the world is drawn (92–124), left→right on the beats
   if(f>=126)R(g,0,0,LW,LH,V);else{R(g,0,0,LW,LH,N);for(const t of SKY){const k=(f-t.t)/5;if(k<=0)continue;const s=Math.ceil(60*Math.min(1,k));R(g,t.x+30-s/2,t.y+30-s/2,s,s,k<1?L:V)}}
@@ -209,7 +209,7 @@ function drawLand(f){
   // ---- hero ----
   if(f<165){const x0=HSX-4*U,y0=FLOOR-9*U;
     HCELLS.forEach(([c,r],i)=>{let tx=x0+c*U,ty=y0+r*U;
-      if(c===3&&r===4){const t=easeInOut((f-90)/12);const s=36+(U-36)*t;cell(g,960-18+(tx-960+18)*t,540-18+(ty-540+18)*t,s,L);return}
+      if(c===3&&r===4){const t=easeInOut((f-90)/12);const s=36+(U-36)*t;cell(g,450-18+(tx-450+18)*t,800-18+(ty-800+18)*t,s,L);return}
       const beat=Math.floor(i/HCELLS.length*4),land=114+beat*15+(i%5),st=land-10;if(f<st)return;
       const t=clamp((f-st)/10);cell(g,tx+((i*137)%500-250)*(1-t),-60+(ty+60)*t*t,U,L)});
   } else {const hs=heroState(f);heroW(g,hsx(f),hs.b,U,hs.o)}
@@ -221,13 +221,14 @@ function drawLand(f){
     R(g,cx-w/2-6,top-6,w+12,h+12+8,N);R(g,cx-w/2,top,w,h,WH);
     g.fillStyle=N;g.fillText(q,cx,top+h/2+(m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2);g.restore();}
   // finale arrow toward the caption (no words)
-  if(f>=572&&Math.floor((f-572)/8)%2===0){const ax=hsx(f)+130,ay=FLOOR-100;for(let i=0;i<3;i++)cell(g,ax+i*26,ay,20,L);for(let i=1;i<3;i++){cell(g,ax+52-i*26,ay-i*26,20,L);cell(g,ax+52-i*26,ay+i*26,20,L)}}
+  if(f>=572&&Math.floor((f-572)/8)%2===0){const ax=hsx(f)-10,ay=FLOOR+70;for(let i=0;i<3;i++)cell(g,ax,ay+i*26,20,L);for(let i=1;i<3;i++){cell(g,ax-i*26,ay+52-i*26,20,L);cell(g,ax+i*26,ay+52-i*26,20,L)}}
+  g.setTransform(1,0,0,1,0,0);
 }
 
 const START=90;
 function draw(f){f+=START;
   ctx.setTransform(1,0,0,1,0,0);
-  drawLand(f);ctx.save();ctx.translate(1080,0);ctx.rotate(Math.PI/2);ctx.drawImage(Lc,0,0);ctx.restore();
+  drawLand(f);ctx.drawImage(Lc,0,0);
 }
 Promise.all([document.fonts.load('900 64px Kufi','نبنيلك موقع'),document.fonts.load('800 50px Taj','شنو أسوّي هسه؟')]).then(()=>{window.draw=draw;window.TOTAL=TOTAL;window.ready=true;});
 </script></body></html>
