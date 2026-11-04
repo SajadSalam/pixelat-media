@@ -4,7 +4,7 @@ html,body{margin:0;background:#232347}canvas{display:block}</style></head>
 <body><canvas id="c" width="1080" height="1920"></canvas>
 <script>
 // Reel 19 «رحلة البكسل» — motion only, no words. Portrait 0–3 s, then the frame turns to landscape.
-const W=1080,H=1920,LW=1920,LH=1080,BEAT=15,TOTAL=600;
+const W=1080,H=1920,LW=1920,LH=1080,BEAT=15,TOTAL=510;
 const V='#612AFF',L='#E0FF38',N='#232347',WH='#FFFFFF';
 const LT='#EEEAFB',PK='#FF7AB6',CY_='#5BD1FF',AM='#FFB547';
 const c=document.getElementById('c'),ctx=c.getContext('2d');
@@ -165,7 +165,7 @@ function station3(g,f){ // ad post on posts
   const fl=easeOut((f-380)/12);g.save();g.translate(cx,y+h/2);g.scale(Math.max(0.01,fl),1);g.translate(-cx,-(y+h/2));adCard(g,x,y,w,h,f);g.restore();
   for(let k=0;k<5;k++){const s=410+k*15;if(f<s)continue;const t=(f-s)/30;if(t>1)continue;heartP(g,x+44+Math.sin(t*6+k)*26,y+352-t*380,5,k%2?L:WH)}
 }
-const SKY=[];{for(let y=0;y<LH;y+=60)for(let x=0;x<LW;x+=60){const band=Math.min(2,Math.floor(x/LW*3));SKY.push({x,y,t:92+band*10+(x/LW*3-band)*6+(y/LH)*3})}}
+const SKY=[];{for(let y=0;y<LH;y+=60)for(let x=0;x<LW;x+=60){const band=Math.min(2,Math.floor(x/LW*3));SKY.push({x,y,t:86+band*10+(x/LW*3-band)*6+(y/LH)*3})}}
 // climax: the sky turns brand violet, growing from the hero, banded on the beats
 const FT=[];{const g=60,maxd=Math.hypot(1400,800);for(let y=0;y<LH;y+=g)for(let x=0;x<LW;x+=g){const d=Math.hypot(x+30-HSX-140,y+30-760)/maxd;const band=Math.min(4,Math.floor(d*5));FT.push({x,y,t:465+band*15+(d*5-band)*8})}}
 
@@ -216,13 +216,9 @@ function drawLand(f){
   if(f>=572&&Math.floor((f-572)/8)%2===0){const ax=hsx(f)+130,ay=FLOOR-100;for(let i=0;i<3;i++)cell(g,ax+i*26,ay,20,L);for(let i=1;i<3;i++){cell(g,ax+52-i*26,ay-i*26,20,L);cell(g,ax+52-i*26,ay+i*26,20,L)}}
 }
 
-function draw(f){
-  ctx.setTransform(1,0,0,1,0,0);R(ctx,0,0,W,H,N);
-  if(f<84){drawPortrait(ctx,f);return}
-  if(f<96){const ang=easeInOut((f-84)/12)*Math.PI/2;const sh=f>=90?14*(1-(f-90)/6):0;
-    ctx.save();ctx.translate(540+Math.sin(f*2.7)*sh,960+Math.cos(f*3.1)*sh);ctx.rotate(ang);
-    if(f<90){drawPortrait(pg,f);ctx.drawImage(Pc,-540,-960)}else{drawLand(f);ctx.drawImage(Lc,-960,-540)}
-    ctx.restore();return}
+const START=90;
+function draw(f){f+=START;
+  ctx.setTransform(1,0,0,1,0,0);
   drawLand(f);ctx.save();ctx.translate(1080,0);ctx.rotate(Math.PI/2);ctx.drawImage(Lc,0,0);ctx.restore();
 }
 document.fonts.load('900 64px Kufi','نبنيلك موقع').then(()=>{window.draw=draw;window.TOTAL=TOTAL;window.ready=true;});
