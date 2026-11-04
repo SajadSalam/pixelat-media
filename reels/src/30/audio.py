@@ -53,7 +53,8 @@ add(music,18.0,crash(),0.5)
 add(music,19.5,kick(),0.9);add(music,19.5,crash(0.5),0.4)
 for m in (57,60,64,69): add(music,19.5,env(pulse(hz(m+12),0.5,0.5),0.003,0.25),0.07)
 
-# world draws itself (ground left→right, trees, clouds)
+# world draws itself (sky paints violet, ground left→right, trees, clouds)
+add(sfx,F(92),sweep(55,79,0.6,0.25),0.35)
 for k in range(9): add(sfx,F(92+k*4),blip(PENT[k%len(PENT)]-12,0.03,0.125),0.25)
 # hero assembly: blip chords per landing cluster + eyes "ding"
 for k,fr in enumerate((114,129,144,159)):
@@ -72,7 +73,7 @@ add(sfx,F(348),blip(91,0.06),0.4)
 # station 3: ad flips in, likes (coins)
 add(sfx,F(380),whoosh(0.35),0.5)
 for fr in (410,425,440,455,470): add(sfx,F(fr),np.concatenate([blip(83,0.06),env(pulse(hz(88),0.22,0.5),0.001,0.1)]),0.6)
-# climax: the sky turns violet in rising sweeps
+# climax: lime pixel wave rolls out on the beats
 for k,fr in enumerate((465,480,495,510,525)): add(sfx,F(fr),sweep(60+k*4,72+k*4,0.3,0.25),0.4)
 # finale: blink, wink, hops, arrow ticks
 add(sfx,F(552),blip(90,0.04),0.4); add(sfx,F(566),np.concatenate([blip(84,0.05),blip(91,0.15)]),0.6)
