@@ -78,6 +78,23 @@ function phoneProfile(g,x,y,f){
   for(let i=0;i<9;i++){const cc=i%3,rr=Math.floor(i/3);const gx=ix+iw-(cc+1)*gs-cc*4+8,yy=gy+rr*(gs+4);if(yy+gs>iy+ih)continue;
     R(g,gx,yy,gs,gs,cols[i]);bottle(g,gx+gs/2-28,yy+gs/2-30,7,i%2?WH:N===cols[i]?L:WH)}
 }
+// ---------- our pixel figures (same body as the lime hero of reel 17 + daily stories) ----------
+const SK=560,U1=26;
+const BODY=[".XXXXXX.","XXXXXXXX","XXXXXXXX","XXXXXXXX","XXXXXXXX","XXXXXXXX",".XXXXXX.",".X....X.",".X....X."];
+const WALK=[[".XX..X..",".X...XX."],["..X..XX.",".XX...X."]];
+function figure(g,cx,bottom,u,o){
+  const body=o.walk===null||o.walk===undefined?BODY:BODY.slice(0,7).concat(WALK[o.walk]);
+  const x0=cx-4*u,y0=bottom-9*u,ov=Math.max(2,Math.round(u*0.28));
+  body.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X')R(g,x0+c*u-ov,y0+r*u-ov,u+2*ov,u+2*ov+4,N)}));
+  body.forEach((row,r)=>[...row].forEach((ch,c)=>{if(ch==='X')R(g,x0+c*u,y0+r*u,u,u,o.col)}));
+  const ex=1+(o.look||0);
+  [ex,ex+3].forEach(c=>{if(o.blink)R(g,x0+c*u,y0+3*u+u*0.35,u,u*0.4,N);else if(o.meh)R(g,x0+c*u,y0+2.6*u,u,u*1.1,N);else R(g,x0+c*u,y0+2*u,u,2*u,N)});
+  if(o.meh)R(g,x0+(2+(o.look||0))*u,y0+5*u,u*3,u*0.45,N);
+  if(o.smile){R(g,x0+2*u,y0+5*u,u*4,u*0.45,N);R(g,x0+1.6*u,y0+4.6*u,u*0.5,u*0.5,N);R(g,x0+5.9*u,y0+4.6*u,u*0.5,u*0.5,N)}
+}
+function igPhone(g,cx,cy,sc){const w=140*sc,h=230*sc,x=cx-w/2,y=cy-h/2;R(g,x-6,y-6,w+12,h+12+8,N);R(g,x,y,w,h,WH);
+  const u=w/14;R(g,x+w-4*u,y+u,3*u,3*u,L);R(g,x+u,y+1.6*u,6*u,u*0.8,GR);R(g,x+u,y+3*u,4*u,u*0.6,GR);
+  const cols=[PK,CYN,AM,L,V,PK,AM,CYN,L],gs=(w-2*u)/3;for(let i=0;i<9;i++)R(g,x+u+(i%3)*gs+1,y+5*u+Math.floor(i/3)*(gs+2),gs-2,gs-2,cols[i])}
 const DMS=[{t:'بيش؟',f:28,side:1,dy:250},{t:'وين مكانكم؟',f:43,side:-1,dy:360},{t:'بيش؟؟',f:58,side:1,dy:470},{t:'أكو توصيل؟',f:73,side:-1,dy:580}];
 function bubble(g,text,cx,cy,side){
   const m=tajM(g,text,46);const w=Math.ceil(m.w)+70,h=96,x=cx-w/2,y=cy-h/2;
@@ -90,19 +107,30 @@ function bubble(g,text,cx,cy,side){
 function scene1(g,f){
   const l1='عندك صفحة إنستا…',l2='وتكول ما أحتاج موقع؟';
   const m1=kufiM(g,l1,80),m2=kufiM(g,l2,80);
-  const items=[{h:m1.h},{h:m2.h,gap:40},{h:PH.h+22,gap:80}];const tops=column(items);
-  LAYOUT.s1={w1:m1.w,w2:m2.w,tops,inkBottom:tops[2]+PH.h+22};
+  const items=[{h:m1.h},{h:m2.h,gap:40},{h:SK,gap:80}];const tops=column(items);
+  LAYOUT.s1={w1:m1.w,w2:m2.w,tops,inkBottom:tops[2]+SK};
   const bp=1+0.025*pulse(f);
   popAt(g,W/2,tops[0]+m1.h/2,f,0,7,()=>{g.save();g.translate(W/2,tops[0]+m1.h/2);g.scale(bp,bp);g.translate(-W/2,-(tops[0]+m1.h/2));kufi(g,l1,W/2,tops[0],80,WH);g.restore()});
   popAt(g,W/2,tops[1]+m2.h/2,f,8,7,()=>{g.save();g.translate(W/2,tops[1]+m2.h/2);g.scale(bp,bp);g.translate(-W/2,-(tops[1]+m2.h/2));kufi(g,l2,W/2,tops[1],80,L);g.restore()});
-  if(f>=12){const a=easeOut((f-12)/12);const px=W/2-PH.w/2,py=tops[2]+(1-a)*700;phoneProfile(g,px,py,f);
-    // unread badge
-    const n=DMS.filter(d=>f>=d.f).length;if(n){const bx=px+PH.w-30,by=py-26,s=f-DMS[n-1].f<5?backOut((f-DMS[n-1].f)/5):1;
-      g.save();g.translate(bx,by);g.scale(s,s);R(g,-38,-38,76,82,N);R(g,-32,-32,64,64,L);const t=String(n*3);const mm=tajM(g,t,40);taj(g,t,0,-mm.h/2,40,N);g.restore()}
-    for(const d of DMS){if(f<d.f)continue;const cx=W/2+d.side*150,cy=py+d.dy;popAt(g,cx,cy,f,d.f,6,()=>bubble(g,d.t,cx,cy,d.side))}
-  }
+  const top=tops[2],G=top+SK-30;R(g,0,G,W,8,N);for(let x=0;x<W;x+=60)R(g,x+10,G+16,24,8,N);
+  // customer (white) walks in, asks, looks at the phone, walks away. Owner (lime) shows his IG page.
+  let cx=W/2-230,cLook=1,cWalk=null,cBlink=false,cMeh=false;
+  if(f<16){cx=-160+(W/2-230+160)*easeOut(f/16);cWalk=Math.floor(f/3)%2}
+  if(f>=58&&f<70){cMeh=true}
+  if(f>=62&&f<65)cBlink=true;
+  if(f>=68){cLook=-1}
+  if(f>=70){cx=W/2-230-(W/2-230+240)*clamp((f-70)/13);cWalk=Math.floor(f/3)%2}
+  const ox=W/2+230;let oLook=-1,oSmile=f>=40&&f<74,oBlink=f>=82&&f<85;
+  const ob=G-(f>=40&&f<46?Math.sin((f-40)/6*Math.PI)*18:0);
+  if(cx>-150)figure(g,cx,G-(cWalk!==null&&cWalk?6:0),U1,{col:WH,look:cLook,walk:cWalk,blink:cBlink,meh:cMeh});
+  figure(g,ox,ob,U1,{col:L,look:oLook,smile:oSmile,blink:oBlink});
+  // the phone: a generic profile grid (no app logo)
+  if(f>=38){const t=easeOut((f-38)/8);const px=ox-70-t*115,py=G-120-t*60;igPhone(g,px,py,0.7+0.45*t)}
+  const hy=G-9*U1-200;
+  if(f>=16&&f<48){const a=f>44?(48-f)/4:1;g.globalAlpha=a;popAt(g,W/2-200,hy,f,16,6,()=>bubble(g,'عندك موقع؟',W/2-200,hy,-1));g.globalAlpha=1}
+  if(f>=44&&f<62){const a=f>58?(62-f)/4:1;g.globalAlpha=a;popAt(g,W/2+200,hy,f,44,6,()=>bubble(g,'هاي صفحتي بالإنستا!',W/2+200,hy,1));g.globalAlpha=1}
+  if(f>=60&&f<72){popAt(g,cx,hy+20,f,60,5,()=>{const w=150,h=80;R(g,cx-w/2-6,hy+20-h/2-6,w+12,h+20,N);R(g,cx-w/2,hy+20-h/2,w,h,WH);for(let i=0;i<3;i++)R(g,cx-40+i*30,hy+12,18,18,N)})}
 }
-
 // ---------- scene 2 (90–179): turn — «الصفحة تعرض… الموقع يبيع» ----------
 function eyeIcon(g,cx,cy,u){const E=["...XXXX...",".XX....XX.","X...NN...X","X..NNNN..X",".XX.NN.XX.","...XXXX..."];
   E.forEach((row,r)=>[...row].forEach((ch,cc)=>{if(ch==='.')return;R(g,cx-5*u+cc*u,cy-3*u+r*u,u,u,ch==='X'?N:N)}))}

@@ -28,8 +28,13 @@ MEL=[[69,72,76,72,74,72,69,67],[65,69,72,69,74,72,69,72],[67,72,76,79,76,72,74,7
 # 0–3 s: hook — notes on the beats, DM pops, riser into the drop
 for k in range(6): add(sfx,k*0.5,blip(PENT[k],0.09,0.25),0.6)
 add(sfx,F(0),sweep(60,72,0.2),0.35); add(sfx,F(8),sweep(64,76,0.2),0.35)
-add(sfx,F(12),sweep(84,60,0.3,0.25),0.35)
-for i,fr in enumerate((28,43,58,73)): add(sfx,F(fr),np.concatenate([blip(79+i*2,0.05,0.25),blip(86+i*2,0.1,0.25)]),0.6)
+for fr in range(0,16,4): add(sfx,F(fr),env(tri(hz(50),0.05),0.001,0.02),0.4)          # customer walks in
+add(sfx,F(16),np.concatenate([blip(79,0.05,0.25),blip(86,0.1,0.25)]),0.6)              # «عندك موقع؟»
+add(sfx,F(38),sweep(67,84,0.18,0.25),0.4); add(sfx,F(40),blip(91,0.05),0.3)           # phone up
+add(sfx,F(44),np.concatenate([blip(83,0.05,0.25),blip(88,0.1,0.25)]),0.6)              # «هاي صفحتي بالإنستا!»
+add(sfx,F(60),np.concatenate([blip(55,0.12,0.5),blip(52,0.2,0.5)]),0.45)              # «...» meh
+add(sfx,F(70),sweep(72,48,0.45,0.5),0.35)                                               # walks away
+for fr in range(70,84,3): add(sfx,F(fr),env(tri(hz(50),0.05),0.001,0.02),0.4)
 rt=t_(1.2); add(music,1.8,env(noise(1.2)*np.linspace(0,1,len(rt))**2,0.01),0.22)
 add(music,3.0,crash(),0.6)
 # layered groove from the drop: kick+bass → +hats/arp → +snare → +lead → full → outro
