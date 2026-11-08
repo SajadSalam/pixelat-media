@@ -1,0 +1,253 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+@font-face{font-family:Kufi;font-weight:900;src:url(../../../kit/fonts/noto-kufi-arabic-arabic-900-normal.woff2) format('woff2')}
+@font-face{font-family:Taj;font-weight:800;src:url(../../../kit/fonts/tajawal-arabic-800-normal.woff2) format('woff2')}
+@font-face{font-family:Taj;font-weight:800;src:url(../../../kit/fonts/tajawal-latin-800-normal.woff2) format('woff2');unicode-range:U+0000-00FF}
+@font-face{font-family:Taj;font-weight:700;src:url(../../../kit/fonts/tajawal-arabic-700-normal.woff2) format('woff2')}
+@font-face{font-family:Taj;font-weight:700;src:url(../../../kit/fonts/tajawal-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF}
+html,body{margin:0;background:#612AFF}canvas{display:block}</style></head>
+<body><canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// Reel 31 «صفحة الإنستا مو موقع» — 20 s, 1080x1920, 30 fps, 120 BPM (beat = 15 frames), drop at 3.0 s.
+const W=1080,H=1920,BEAT=15,TOTAL=600,CY=900;
+const V='#612AFF',L='#E0FF38',N='#232347',WH='#FFFFFF';
+// example-screen tones (allowed inside example screens only)
+const LT='#F1EEFB',GR='#C9C3E0',GD='#8A7FB8',PK='#FF7AB6',CYN='#5BD1FF',AM='#FFB547';
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const easeOut=t=>1-Math.pow(1-clamp(t),3);
+const easeInOut=t=>{t=clamp(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2};
+const backOut=t=>{t=clamp(t);const s=1.9;return 1+(s+1)*Math.pow(t-1,3)+s*Math.pow(t-1,2)};
+const pulse=f=>Math.exp(-(((f%BEAT)+BEAT)%BEAT)/3.2);
+function rng(seed){let s=seed>>>0;return()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296}}
+function R(g,x,y,w,h,col){g.fillStyle=col;g.fillRect(x,y,w,h)}
+function raised(g,x,y,w,h,fill,o=6,e=12){R(g,x-o,y-o,w+2*o,h+2*o+e,N);R(g,x,y,w,h,fill)}
+function cell(g,x,y,s,col){const o=Math.max(2,Math.round(s*0.25));R(g,x-o,y-o,s+2*o,s+2*o+3,N);R(g,x,y,s,s,col)}
+let ICON=null;
+
+// ---------- text ----------
+// Kufi headline with navy outline + extrude. Metrics are measured on the ink (outline + extrude included).
+const OL=12,EX=9;
+function kufiM(g,text,size){g.font=`900 ${size}px Kufi`;g.direction='rtl';const m=g.measureText(text);
+  return{w:m.width+OL,asc:m.actualBoundingBoxAscent,desc:m.actualBoundingBoxDescent,h:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent+OL+EX}}
+function kufi(g,text,cx,top,size,col){ // top = ink top
+  const m=kufiM(g,text,size);const base=top+OL/2+m.asc;
+  g.font=`900 ${size}px Kufi`;g.direction='rtl';g.textAlign='center';g.textBaseline='alphabetic';g.lineJoin='round';
+  g.fillStyle=N;g.strokeStyle=N;g.lineWidth=OL;
+  for(let k=EX;k>=1;k--){g.strokeText(text,cx,base+k);g.fillText(text,cx,base+k)}
+  g.strokeText(text,cx,base);g.fillStyle=col;g.fillText(text,cx,base);return m;
+}
+function tajM(g,text,size,wt=800){g.font=`${wt} ${size}px Taj`;g.direction='rtl';const m=g.measureText(text);return{w:m.width,asc:m.actualBoundingBoxAscent,desc:m.actualBoundingBoxDescent,h:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent}}
+function taj(g,text,x,top,size,col,align='center',wt=800){const m=tajM(g,text,size,wt);
+  g.font=`${wt} ${size}px Taj`;g.direction='rtl';g.textAlign=align;g.textBaseline='alphabetic';g.fillStyle=col;g.fillText(text,x,top+m.asc);return m}
+// pop/zoom helper around a point
+function popAt(g,cx,cy,f,start,dur=7,fn){if(f<start)return;const t=(f-start)/dur;const s=t>=1?1:Math.max(0.01,backOut(t));
+  g.save();g.translate(cx,cy);g.scale(s,s);g.translate(-cx,-cy);fn();g.restore()}
+
+// ---------- background ----------
+const SPARK=[];{const r=rng(7);for(let i=0;i<26;i++)SPARK.push({x:r()*W,y:r()*H,s:8+Math.floor(r()*3)*6,c:r()<0.5?L:WH,sp:0.3+r()*0.8,ph:r()*6})}
+function bg(g,f){
+  R(g,0,0,W,H,V);const p=pulse(f);
+  g.globalAlpha=0.10+0.10*p;g.fillStyle=N;
+  for(let x=0;x<=W;x+=60)g.fillRect(x-1,0,2,H);for(let y=0;y<=H;y+=60)g.fillRect(0,y-1,W,2);
+  g.globalAlpha=1;
+  for(const s of SPARK){const y=((s.y-f*s.sp*2)%H+H)%H;g.globalAlpha=0.25+0.2*Math.sin(f/9+s.ph);R(g,Math.round(s.x/6)*6,Math.round(y/6)*6,s.s,s.s,s.c)}
+  g.globalAlpha=1;
+}
+
+// ---------- column layout: items centred on y=900, gaps measured on the ink ----------
+// item: {h, draw(top)}  gap before item i = item.gap (40 between lines of one phrase, 80 before a visual/button)
+function column(items){let tot=0;items.forEach((it,i)=>{tot+=it.h+(i?it.gap:0)});let y=CY-tot/2;const tops=[];
+  items.forEach((it,i)=>{if(i)y+=it.gap;tops.push(y);y+=it.h});return tops}
+const LAYOUT={};
+
+// ---------- scene 1 (0–89): hook — phone page full of «بيش؟» ----------
+const PH={w:500,h:640};
+function bottle(g,x,y,u,col){const B=["..NNN...","..NLN...",".NNNNN..","NCCCCCN.","NCWCCCN.","NCWCCCN.","NCCCCCN.",".NNNNN.."];
+  B.forEach((row,r)=>[...row].forEach((ch,cc)=>{if(ch==='.')return;R(g,x+cc*u,y+r*u,u,u,ch==='N'?N:ch==='L'?L:ch==='W'?WH:col)}))}
+function phoneProfile(g,x,y,f){
+  const w=PH.w,h=PH.h;raised(g,x,y,w,h,N,8,14);const ix=x+14,iy=y+14,iw=w-28,ih=h-28;R(g,ix,iy,iw,ih,WH);
+  R(g,x+w/2-40,y+22,80,10,N);
+  // profile header (RTL): avatar right, name + bio lines left
+  const ax=ix+iw-30-110,ay=iy+40;R(g,ax-5,ay-5,120,120,N);R(g,ax,ay,110,110,L);bottle(g,ax+23,ay+16,9,PK);
+  taj(g,'متجرك',ax-24,ay+14,40,N,'right');R(g,ax-24-210,ay+70,210,12,GR);R(g,ax-24-150,ay+92,150,12,GR);
+  // «follow / message» buttons
+  R(g,ix+30,ay+140,(iw-80)/2,46,V);R(g,ix+50+(iw-80)/2,ay+140,(iw-80)/2,46,LT);
+  // post grid 3x3
+  const gy=ay+210,gs=(iw-8)/3,cols=[PK,CYN,AM,L,V,PK,AM,CYN,L];
+  for(let i=0;i<9;i++){const cc=i%3,rr=Math.floor(i/3);const gx=ix+iw-(cc+1)*gs-cc*4+8,yy=gy+rr*(gs+4);if(yy+gs>iy+ih)continue;
+    R(g,gx,yy,gs,gs,cols[i]);bottle(g,gx+gs/2-28,yy+gs/2-30,7,i%2?WH:N===cols[i]?L:WH)}
+}
+const DMS=[{t:'بيش؟',f:28,side:1,dy:250},{t:'وين مكانكم؟',f:43,side:-1,dy:360},{t:'بيش؟؟',f:58,side:1,dy:470},{t:'أكو توصيل؟',f:73,side:-1,dy:580}];
+function bubble(g,text,cx,cy,side){
+  const m=tajM(g,text,46);const w=Math.ceil(m.w)+70,h=96,x=cx-w/2,y=cy-h/2;
+  R(g,x-6,y-6,w+12,h+12+8,N);R(g,x,y,w,h,WH);
+  // tail
+  const tx=side>0?x+w-36:x+12;for(let k=0;k<3;k++)R(g,tx+(side>0?k*8:-k*8)-4,y+h+k*10,24-k*4+8,14,N);
+  for(let k=0;k<3;k++)R(g,tx+(side>0?k*8:-k*8),y+h+k*10,24-k*4,8,WH);
+  taj(g,text,cx,cy-m.h/2,46,N);
+}
+function scene1(g,f){
+  const l1='عندك صفحة إنستا…',l2='وتكول ما أحتاج موقع؟';
+  const m1=kufiM(g,l1,80),m2=kufiM(g,l2,80);
+  const items=[{h:m1.h},{h:m2.h,gap:40},{h:PH.h+22,gap:80}];const tops=column(items);
+  LAYOUT.s1={w1:m1.w,w2:m2.w,tops,inkBottom:tops[2]+PH.h+22};
+  const bp=1+0.025*pulse(f);
+  popAt(g,W/2,tops[0]+m1.h/2,f,0,7,()=>{g.save();g.translate(W/2,tops[0]+m1.h/2);g.scale(bp,bp);g.translate(-W/2,-(tops[0]+m1.h/2));kufi(g,l1,W/2,tops[0],80,WH);g.restore()});
+  popAt(g,W/2,tops[1]+m2.h/2,f,8,7,()=>{g.save();g.translate(W/2,tops[1]+m2.h/2);g.scale(bp,bp);g.translate(-W/2,-(tops[1]+m2.h/2));kufi(g,l2,W/2,tops[1],80,L);g.restore()});
+  if(f>=12){const a=easeOut((f-12)/12);const px=W/2-PH.w/2,py=tops[2]+(1-a)*700;phoneProfile(g,px,py,f);
+    // unread badge
+    const n=DMS.filter(d=>f>=d.f).length;if(n){const bx=px+PH.w-30,by=py-26,s=f-DMS[n-1].f<5?backOut((f-DMS[n-1].f)/5):1;
+      g.save();g.translate(bx,by);g.scale(s,s);R(g,-38,-38,76,82,N);R(g,-32,-32,64,64,L);const t=String(n*3);const mm=tajM(g,t,40);taj(g,t,0,-mm.h/2,40,N);g.restore()}
+    for(const d of DMS){if(f<d.f)continue;const cx=W/2+d.side*150,cy=py+d.dy;popAt(g,cx,cy,f,d.f,6,()=>bubble(g,d.t,cx,cy,d.side))}
+  }
+}
+
+// ---------- scene 2 (90–179): turn — «الصفحة تعرض… الموقع يبيع» ----------
+function eyeIcon(g,cx,cy,u){const E=["...XXXX...",".XX....XX.","X...NN...X","X..NNNN..X",".XX.NN.XX.","...XXXX..."];
+  E.forEach((row,r)=>[...row].forEach((ch,cc)=>{if(ch==='.')return;R(g,cx-5*u+cc*u,cy-3*u+r*u,u,u,ch==='X'?N:N)}))}
+function bagIcon(g,cx,cy,u){const B=["...NNNN...","..N....N..","..N....N..","NNNNNNNNNN","NLLLLLLLLN","NLLLLLLLLN","NLLLNNLLLN","NLLLLLLLLN","NNNNNNNNNN"];
+  B.forEach((row,r)=>[...row].forEach((ch,cc)=>{if(ch==='.')return;R(g,cx-5*u+cc*u,cy-4.5*u+r*u,u,u,ch==='N'?N:L)}))}
+function scene2(g,f){
+  const l1='الصفحة تعرض…',l2='الموقع يبيع';
+  const m1=kufiM(g,l1,92),m2=kufiM(g,l2,124);const TH=260;
+  const tops=column([{h:m1.h},{h:m2.h,gap:40},{h:TH+18,gap:80}]);LAYOUT.s2={w1:m1.w,w2:m2.w,tops};
+  const bp=1+0.025*pulse(f);
+  const hl=(t,top,size,col,st,m)=>popAt(g,W/2,top+m.h/2,f,st,7,()=>{g.save();g.translate(W/2,top+m.h/2);g.scale(bp,bp);g.translate(-W/2,-(top+m.h/2));kufi(g,t,W/2,top,size,col);g.restore()});
+  hl(l1,tops[0],92,WH,90,m1);hl(l2,tops[1],124,L,105,m2);
+  // two tiles: page (eye) → site (bag), arrow between. RTL reading: page on the right, site on the left.
+  const ty=tops[2],tw=TH,rx=W/2+60,lx=W/2-60-tw;
+  popAt(g,rx+tw/2,ty+TH/2,f,98,7,()=>{raised(g,rx,ty,tw,TH,WH,8,14);
+    const gs=48;for(let i=0;i<9;i++)R(g,rx+40+(i%3)*(gs+18)+12,ty+30+Math.floor(i/3)*(gs+18),gs,gs,GR);
+    g.globalAlpha=0.92;R(g,rx+20,ty+TH/2-44,tw-40,88,WH);g.globalAlpha=1;eyeIcon(g,rx+tw/2,ty+TH/2,14)});
+  if(f>=112){const k=Math.floor((f-112)/5);for(let i=0;i<3;i++){if(i>k)break;cell(g,W/2+30-i*30,ty+TH/2-9,18,i===k%3?L:WH)}}
+  popAt(g,lx+tw/2,ty+TH/2,f,120,7,()=>{const s=1+0.05*pulse(f);raised(g,lx,ty,tw,TH,V,8,14);
+    g.save();g.translate(lx+tw/2,ty+TH/2);g.scale(s,s);bagIcon(g,0,0,18);g.restore();
+    if(f>=132){const t=((f-132)%30)/30;R(g,lx+tw-60,ty+40-t*30,22,22,L);R(g,lx+40,ty+70-((t+0.5)%1)*30,16,16,WH)}});
+}
+
+// ---------- scene 3 (180–389): demo — search → «متجرك» → order ----------
+const WIN={w:820,h:780};
+const Wc=document.createElement('canvas');Wc.width=WIN.w;Wc.height=WIN.h;const wg=Wc.getContext('2d');
+const STEPS=[{f:180,t:'الزبون يدوّر بكوكل'},{f:255,t:'يلكى متجرك'},{f:330,t:'ويطلب بدون ما يراسل'}];
+const PRODUCTS=[{n:'عطر الليل',p:'25,000 دينار',c:AM},{n:'ورد',p:'18,000 دينار',c:PK},{n:'عود',p:'35,000 دينار',c:CYN},{n:'مسك',p:'15,000 دينار',c:L}];
+function cursor(g,x,y,down){const C=["X.......","XX......","XWX.....","XWWX....","XWWWX...","XWWWWX..","XWWXXX..","XX.XWX..","X...XWX.","....XX.."];
+  const u=down?5:6;C.forEach((row,r)=>[...row].forEach((ch,cc)=>{if(ch==='.')return;R(g,x+cc*u,y+r*u,u,u,ch==='X'?N:WH)}))}
+function lerpPt(a,b,t){t=easeInOut(t);return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]}
+function winStep1(g,f){const w=WIN.w;const t0=f-180;
+  // search bar
+  R(g,40,40,w-80,90,N);R(g,46,46,w-92,78,WH);
+  // magnifier (left side, RTL)
+  R(g,72,66,30,30,N);R(g,78,72,18,18,WH);R(g,100,94,10,10,N);R(g,108,102,10,10,N);
+  const q='عطور ببغداد';const n=Math.min(q.length,Math.max(0,Math.floor((t0-4)/2.2)));const typed=q.slice(0,n);
+  const mm=tajM(g,'عطور',46);taj(g,typed,w-80,85-mm.h/2-4,46,N,'right');
+  if(n<q.length&&Math.floor(t0/6)%2===0){const tw=tajM(g,typed||' ',46).w;R(g,w-84-tw-6,62,5,46,N)}
+  // results
+  if(t0>=32){const rows=[{name:'متجرك',hi:1},{hi:0},{hi:0}];
+    rows.forEach((r,i)=>{const st=32+i*4;if(t0<st)return;const a=easeOut((t0-st)/8);const y=170+i*150+(1-a)*40;g.globalAlpha=a;
+      const hi=r.hi&&t0>=44;const flash=t0>=62&&t0<66;
+      R(g,40,y,w-80,128,hi?(flash?V:L):N);R(g,46,y+6,w-92,116,flash&&hi?'#EDE6FF':WH);
+      R(g,w-150,y+24,80,80,r.hi?L:GR);if(r.hi)bottle(g,w-142,y+32,8,PK);
+      if(r.name){taj(g,r.name,w-170,y+26,44,N,'right');R(g,w-170-300,y+86,300,12,GR)}
+      else{R(g,w-170-280,y+34,280,20,GR);R(g,w-170-220,y+80,220,12,LT)}
+      g.globalAlpha=1});}
+  if(t0>=46){const p=lerpPt([w/2+60,700],[w-260,236],(t0-46)/14);cursor(g,p[0],p[1],t0>=62&&t0<66)}
+}
+function prodCard(g,x,y,cw,chh,pr){R(g,x-4,y-4,cw+8,chh+8+6,N);R(g,x,y,cw,chh,WH);R(g,x+12,y+12,cw-24,150,LT);bottle(g,x+cw/2-36,y+40,9,pr.c);
+  taj(g,pr.n,x+cw-16,y+178,34,N,'right');taj(g,pr.p,x+cw-16,y+226,28,V,'right',700)}
+function siteHeader(g,cart){const w=WIN.w;R(g,0,0,w,96,N);
+  g.font='900 46px Kufi';g.direction='rtl';g.textAlign='right';g.textBaseline='middle';g.fillStyle=L;g.fillText('متجرك',w-36,50);
+  // cart (left)
+  R(g,40,32,44,30,L);R(g,46,62,10,10,L);R(g,70,62,10,10,L);R(g,32,26,14,8,L);
+  if(cart){R(g,72,14,34,34,N);R(g,76,18,26,26,PK);const mm=tajM(g,'1',24);taj(g,'1',89,31-mm.h/2,24,WH)}}
+function winStep2(g,f){const w=WIN.w,t0=f-255;const sc=easeInOut((t0-20)/24)*150;
+  g.save();g.translate(0,-sc);
+  // banner
+  R(g,30,126,w-60,200,V);kufi(g,'عطور أصلية',w/2+120,166,58,WH);R(g,w/2-260+120,252,170,48,L);taj(g,'تسوّق',w/2-175+120,262,30,N);
+  bottle(g,90,150,16,AM);
+  const cw=(w-60-24)/2,chh=262;PRODUCTS.forEach((pr,i)=>{const st=6+i*4;if(t0<st)return;const a=easeOut((t0-st)/8);g.globalAlpha=a;
+    const cc=i%2,rr=Math.floor(i/2);prodCard(g,w-30-(cc+1)*cw-cc*24,356+rr*(chh+30)+(1-a)*30,cw,chh,pr);g.globalAlpha=1});
+  g.restore();siteHeader(g,false);
+  if(t0>=44){const p=lerpPt([w/2,720],[w-200,420],(t0-44)/16);cursor(g,p[0],p[1],t0>=62&&t0<67)}
+}
+function winStep3(g,f){const w=WIN.w,t0=f-330,pr=PRODUCTS[0];
+  R(g,30,126,w-60,300,LT);bottle(g,w/2-72,150,32,pr.c);
+  taj(g,pr.n,w-40,456,52,N,'right');taj(g,pr.p,w-40,530,40,V,'right',700);
+  // size chips
+  [['50 مل',1],['100 مل',0]].forEach(([s,on],i)=>{const cw=150,x=w-40-(i+1)*cw-i*20,y=600;R(g,x-4,y-4,cw+8,72,N);R(g,x,y,cw,64,on?L:WH);const mm=tajM(g,s,32);taj(g,s,x+cw/2,y+32-mm.h/2,32,N)});
+  // order button
+  const pressed=t0>=20&&t0<25;const by=pressed?696:690;R(g,36,686,w-72,96,N);R(g,40,by,w-80,pressed?86:80,L);
+  const mm=tajM(g,'اطلب',46);taj(g,'اطلب',w/2,by+40-mm.h/2,46,N);
+  siteHeader(g,t0>=24);
+  if(t0<26){const p=lerpPt([w-200,560],[w/2+40,720],t0/16);cursor(g,p[0],p[1],pressed)}
+  // toast: new order
+  if(t0>=25){const a=easeOut((t0-25)/7);const ty=-120+a*240;R(g,60,ty-6,w-120,108,N);R(g,66,ty,w-132,90,WH);R(g,w-140,ty+15,60,60,L);bagIcon(g,w-110,ty+45,5);
+    const tm=tajM(g,'وصلك طلب جديد!',42);taj(g,'وصلك طلب جديد!',w-160,ty+45-tm.h/2,42,N,'right');}
+}
+function scene3(g,f){
+  const step=f>=330?2:f>=255?1:0;const st=STEPS[step];
+  const ms=STEPS.map(s=>kufiM(g,s.t,76));const lh=Math.max(...ms.map(m=>m.h));
+  const SQ=89;const tops=column([{h:lh},{h:SQ+WIN.h+16,gap:80}]);LAYOUT.s3={labelW:ms.map(m=>m.w),tops};
+  // label (pops on each step)
+  const m=ms[step];popAt(g,W/2,tops[0]+lh/2,f,st.f+(step?0:2),7,()=>kufi(g,st.t,W/2,tops[0]+(lh-m.h),76,L));
+  // window
+  const x=W/2-WIN.w/2,y=tops[1]+SQ;const a=easeOut((f-182)/12);const yy=y+(1-a)*800;
+  wg.setTransform(1,0,0,1,0,0);R(wg,0,0,WIN.w,WIN.h,WH);
+  if(step===0)winStep1(wg,f);else if(step===1)winStep2(wg,f);else winStep3(wg,f);
+  // step swap: pixel wipe inside the window
+  for(const sf of [255,330]){const k=f-sf;if(k>=-6&&k<6){const prog=(k+6)/12;for(let yy2=0;yy2<WIN.h;yy2+=60)for(let xx=0;xx<WIN.w;xx+=60){const d=(WIN.w-xx)/WIN.w*0.6+yy2/WIN.h*0.4;const s=Math.ceil(60*clamp(1-Math.abs(prog*1.6-0.3-d)*3));if(s>0)R(wg,xx+30-s/2,yy2+30-s/2,s,s,V)}}}
+  raised(g,x,yy,WIN.w,WIN.h,N,8,16);g.drawImage(Wc,x,yy);
+  // progress squares on the window frame (top, centred)
+  for(let i=0;i<3;i++){const on=i<=step;const sx=W/2+60-i*60-15,sy=yy-SQ+8;cell(g,sx,sy,30,on?L:WH);}
+}
+
+// ---------- scene 4 (390–479): slogan + pixel icon ----------
+function scene4(g,f){
+  const sl='كل بكسل محسوب';const m=kufiM(g,sl,96);const iw=340,ih=Math.round(340*491/672);
+  const tops=column([{h:ih},{h:m.h,gap:80}]);LAYOUT.s4={w:m.w,tops};
+  popAt(g,W/2,tops[0]+ih/2,f,392,8,()=>{const s=1+0.04*pulse(f);g.save();g.translate(W/2,tops[0]+ih/2);g.scale(s,s);g.imageSmoothingEnabled=false;g.drawImage(ICON,-iw/2,-ih/2,iw,ih);g.restore()});
+  popAt(g,W/2,tops[1]+m.h/2,f,405,8,()=>{const s=1+0.025*pulse(f);g.save();g.translate(W/2,tops[1]+m.h/2);g.scale(s,s);g.translate(-W/2,-(tops[1]+m.h/2));kufi(g,sl,W/2,tops[1],96,L);g.restore()});
+  // pixels orbit in on the beats
+  for(let i=0;i<8;i++){const st=392+i*3;if(f<st)continue;const t=easeOut((f-st)/12);const ang=i/8*Math.PI*2+f/40;const r=520-t*260;
+    if(t<1)cell(g,W/2+Math.cos(ang)*r-10,tops[0]+ih/2+Math.sin(ang)*r-10,20,i%2?L:WH)}
+}
+
+// ---------- scene 5 (480–599): CTA — no logo, no handle ----------
+function moon(g,cx,cy,u){const M=["..XXXX..",".XXX....","XXX.....","XXX.....","XXX.....","XXX.....",".XXX....","..XXXX.."];
+  M.forEach((row,r)=>[...row].forEach((ch,cc)=>{if(ch==='X')R(g,cx-4*u+cc*u-4,cy-4*u+r*u-4,u+8,u+8,N)}));
+  M.forEach((row,r)=>[...row].forEach((ch,cc)=>{if(ch==='X')R(g,cx-4*u+cc*u,cy-4*u+r*u,u,u,L)}))}
+function scene5(g,f){
+  const l1='تريد موقع',l2='يشتغل وإنت نايم؟',bt='راسلنا بالخاص';
+  const m1=kufiM(g,l1,96),m2=kufiM(g,l2,100);const bm=tajM(g,bt,60);const BW=Math.ceil(bm.w)+120,BH=124;
+  const tops=column([{h:m1.h},{h:m2.h,gap:40},{h:BH+18,gap:80}]);LAYOUT.s5={w1:m1.w,w2:m2.w,bw:BW,tops};
+  const bp=1+0.025*pulse(f);
+  const hl=(t,top,size,col,st,m)=>popAt(g,W/2,top+m.h/2,f,st,7,()=>{g.save();g.translate(W/2,top+m.h/2);g.scale(bp,bp);g.translate(-W/2,-(top+m.h/2));kufi(g,t,W/2,top,size,col);g.restore()});
+  // night touch: moon + twinkling stars above the column
+  if(f>=484){const a=easeOut((f-484)/10);g.globalAlpha=a;moon(g,W/2+300,tops[0]-170,14);
+    [[W/2-330,tops[0]-200],[W/2-170,tops[0]-120],[W/2+120,tops[0]-230]].forEach(([x,y],i)=>{const tw=Math.floor((f+i*7)/10)%2;R(g,x,y,tw?14:8,tw?14:8,WH)});g.globalAlpha=1}
+  hl(l1,tops[0],96,WH,481,m1);hl(l2,tops[1],100,L,492,m2);
+  popAt(g,W/2,tops[2]+BH/2,f,510,8,()=>{const s=1+0.04*pulse(f);g.save();g.translate(W/2,tops[2]+BH/2);g.scale(s,s);
+    const x=-BW/2,y=-BH/2;R(g,x-8,y-8,BW+16,BH+16+14,N);R(g,x,y,BW,BH,L);const tm=tajM(g,bt,60);taj(g,bt,0,-tm.h/2,60,N);g.restore()});
+}
+
+// ---------- transitions: squares grow in an ordered wave (lime edge, navy behind) ----------
+const CUTS=[{f:90,dir:'up'},{f:180,dir:'rtl'},{f:390,dir:'centre'},{f:480,dir:'down'}];
+function wave(g,f){
+  for(const c of CUTS){const k=f-c.f;if(k<-8||k>=8)continue;const S=120;
+    for(let y=0;y<H;y+=S)for(let x=0;x<W;x+=S){
+      let d;if(c.dir==='up')d=1-y/H;else if(c.dir==='down')d=y/H;else if(c.dir==='rtl')d=1-x/W;else d=Math.hypot(x+S/2-W/2,y+S/2-H/2)/Math.hypot(W/2,H/2);
+      const t=k<0?clamp((k+8)/6-d*0.6+0.0):clamp(1-((k)/6-d*0.6+0.25));const s=Math.ceil(S*t);if(s<=0)continue;
+      R(g,x+S/2-s/2,y+S/2-s/2,s,s,N);if(s>14)R(g,x+S/2-s/2+5,y+S/2-s/2+5,s-10,s-10,V);if(s>30)R(g,x+S/2-s/2+5,y+S/2-s/2+5,s-10,5,L);}}
+}
+
+function draw(f){
+  ctx.setTransform(1,0,0,1,0,0);bg(ctx,f);
+  const start=f<90?0:f<180?90:f<390?180:f<480?390:480;
+  const z=1+0.06*(1-easeOut((f-start)/10));ctx.save();ctx.translate(W/2,CY);ctx.scale(z,z);ctx.translate(-W/2,-CY);
+  if(f<90)scene1(ctx,f);else if(f<180)scene2(ctx,f);else if(f<390)scene3(ctx,f);else if(f<480)scene4(ctx,f);else scene5(ctx,f);
+  ctx.restore();wave(ctx,f);
+}
+window.layoutInfo=()=>{for(const f of [80,170,300,470,590])draw(f);return LAYOUT};
+const img=new Image();img.src='../../../kit/assets/icon.png';
+Promise.all([document.fonts.load('900 64px Kufi','كل بكسل محسوب'),document.fonts.load('800 50px Taj','راسلنا بالخاص 25,000'),document.fonts.load('700 50px Taj','دينار 25,000'),new Promise(r=>{img.onload=r})]).then(()=>{ICON=img;window.draw=draw;window.TOTAL=TOTAL;window.ready=true;});
+</script></body></html>
